@@ -1,0 +1,147 @@
+import type { Agent, AgentId } from '@hameau/shared';
+import type { Brain, Sim } from '../sim/Sim';
+import { neighbors } from '../sim/graph';
+import type { LLMProvider, LLMRequest } from '../llm/LLMProvider';
+import { DecisionSchema, SummarySchema, VoteSchema, toActions, voteActions } from './decision';
+import { situationPrompt, summaryPrompt, systemPrompt, votePrompt, type Trigger } from './prompts';
+import { CHATTER, createScript } from './scripted';
+
+/** Ticks entre la réponse du modèle et l'exécution (le temps d'enfiler son manteau). */
+const ACT_DELAY = 2;
+/** Probabilité de répondre à un simple bavardage (chaque réponse coûte un appel). */
+const CHAT_REPLY_CHANCE = 0.4;
+
+/**
+ * Cerveau piloté par un LLMProvider. Un agent se « réveille » sur un déclencheur
+ * (début de journée, message reçu, événement), le modèle décide, et les actions validées
+ * sont rejouées dans la simulation. En mock, le provider renvoie la réponse scriptée.
+ */
+export function createLLMBrain(provider: LLMProvider, seed?: number): Brain {
+  const script = createScript(seed);
+  const busy = new Set<AgentId>();
+  const queued = new Map<AgentId, Trigger[]>();
+  let exhaustedDay = 0;
+
+  /** Réserve un appel dans le budget du jour. false si le budget est épuisé. */
+  function reserve(sim: Sim): boolean {
+    const b = sim.world.llm.budget;
+    if (b.callsToday < b.maxCallsPerDay) {
+      b.callsToday++;
+      return true;
+    }
+    if (exhaustedDay !== sim.clock.day) {
+      exhaustedDay = sim.clock.day;
+      sim.emit('llm.budget_exhausted', [], `🧠 Budget LLM du jour épuisé (${b.maxCallsPerDay} appels) : le village se tait jusqu’à demain.`);
+    }
+    return false;
+  }
+
+  async function call<T>(sim: Sim, agent: Agent, purpose: string, req: LLMRequest<T>): Promise<T | null> {
+    const res = await provider.complete(req);
+    const b = sim.world.llm.budget;
+    b.tokensIn += res.tokensIn;
+    b.tokensOut += res.tokensOut;
+    sim.touchLLM();
+    sim.emit('llm.call', [agent.id], `🧠 ${agent.name} · ${purpose} · ${res.tokensIn}→${res.tokensOut} tokens${res.error ? ` · ⚠️ ${res.error}` : ''}`, {
+      provider: provider.name, purpose, tokensIn: res.tokensIn, tokensOut: res.tokensOut, error: res.error,
+    });
+    return res.data;
+  }
+
+  async function wake(sim: Sim, agentId: AgentId, trigger: Trigger) {
+    if (busy.has(agentId)) {
+      queued.set(agentId, [...(queued.get(agentId) ?? []), trigger]);
+      return;
+    }
+    const agent = sim.agent(agentId);
+    if (!agent || !reserve(sim)) return;
+    busy.add(agentId);
+    sim.setActivity(agentId, 'thinking');
+    try {
+      const decision = await call(sim, agent, 'décision', {
+        system: systemPrompt(agent, agent.id === sim.world.mayorId),
+        prompt: situationPrompt(sim.world, agent, trigger),
+        schema: DecisionSchema,
+        scripted: () => script.decide(sim.world, agent, trigger),
+      });
+      const actions = decision ? toActions(sim.world, agent, decision) : [{ type: 'think' as const, text: '…' }];
+      if (actions.length) sim.plan(agentId, ACT_DELAY, actions);
+      else sim.setActivity(agentId, 'idle');
+    } finally {
+      busy.delete(agentId);
+      const next = queued.get(agentId)?.shift();
+      if (next) void wake(sim, agentId, next);
+    }
+  }
+
+  return {
+    onDayStart(sim) {
+      script.newDay();
+      void wake(sim, sim.world.mayorId, { type: 'day' });
+    },
+
+    onMessage(sim, agent, msg) {
+      if (msg.kind === 'chat' && script.rand() > CHAT_REPLY_CHANCE) return;
+      void wake(sim, agent.id, { type: 'message', msg });
+    },
+
+    onInject(sim, text) {
+      script.inject(text);
+      const scout = Object.values(sim.world.agents).find((a) => a.role === 'ECLAIREUR');
+      if (scout) void wake(sim, scout.id, { type: 'inject', text });
+    },
+
+    onVoteOpened(sim, vote) {
+      // Chaque habitant remplit son bulletin. Sans budget, le bulletin scripté (gratuit) prend le relais :
+      // un vote ne doit jamais être bloqué par le compteur.
+      for (const agent of Object.values(sim.world.agents)) {
+        const scripted = () => script.vote(sim.world, agent, vote);
+        const delay = 3 + Math.floor(script.rand() * 30);
+        if (provider.name === 'mock' || !reserve(sim)) {
+          sim.plan(agent.id, delay, voteActions(sim.world, agent, scripted()));
+          continue;
+        }
+        sim.setActivity(agent.id, 'voting');
+        void call(sim, agent, 'vote', {
+          system: systemPrompt(agent, agent.id === sim.world.mayorId),
+          prompt: votePrompt(sim.world, agent, vote),
+          schema: VoteSchema,
+          scripted,
+        }).then((v) => sim.plan(agent.id, 2, voteActions(sim.world, agent, v ?? scripted())));
+      }
+    },
+
+    onDayEnd(sim) {
+      if (provider.name === 'mock') {
+        for (const s of script.moodSwings(sim.world)) sim.adjustOpinion(s.who, s.about, s.delta);
+      }
+      // Mémoire longue : résumé par le modèle s'il reste du budget, sinon registre scripté (gratuit).
+      for (const agent of Object.values(sim.world.agents)) {
+        if (!agent.memory.short.some((m) => m.day === sim.clock.day)) continue;
+        const fallback = script.summarize(sim.world, agent);
+        if (provider.name === 'mock' || !reserve(sim)) {
+          agent.memory.long = fallback;
+          continue;
+        }
+        void call(sim, agent, 'mémoire', {
+          system: systemPrompt(agent, agent.id === sim.world.mayorId),
+          prompt: summaryPrompt(sim.world, agent),
+          schema: SummarySchema,
+          scripted: () => ({ summary: fallback }),
+        }).then((s) => (agent.memory.long = s?.summary.slice(0, 600) ?? fallback));
+      }
+    },
+
+    onTick(sim) {
+      // Bavardage d'ambiance, gratuit (scripté, sans appel LLM) : rare, un seul à la fois.
+      if (script.rand() > 0.012) return;
+      if (Object.values(sim.world.messages).some((m) => m.kind === 'chat')) return;
+      const idle = Object.values(sim.world.agents).filter((a) => a.activity === 'idle' && !busy.has(a.id));
+      if (!idle.length) return;
+      const a = script.pick(idle);
+      const ns = neighbors(sim.world, a.id);
+      if (!ns.length) return;
+      sim.plan(a.id, 1, [{ type: 'send', to: script.pick(ns), kind: 'chat', body: script.pick(CHATTER[a.role] ?? ['Bonjour !']) }]);
+    },
+  };
+}

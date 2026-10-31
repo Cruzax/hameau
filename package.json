@@ -1,0 +1,21 @@
+{
+  "name": "hameau",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Un village 3D low-poly où des agents IA vivent, collaborent et peuvent destituer leur maire.",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n sim,web -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:client": "npm run dev -w client",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run build -w client",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client"
+  },
+  "devDependencies": {
+    "concurrently": "9.1.0"
+  }
+}
