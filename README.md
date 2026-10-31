@@ -75,14 +75,14 @@ la gazette et les votes, et elle connaît l'état de chacun (faim, argent, rumeu
 
 ## Contenu sans IA
 
-Tout ce qui suit est écrit à la main dans [](server/src/content/) ; ajouter une ligne
+Tout ce qui suit est écrit à la main dans [`server/src/content/`](server/src/content/) ; ajouter une ligne
 suffit pour enrichir le village :
 
--  : répliques par métier, phrases selon la situation, échanges amicaux, amoureux, hostiles
--  : événements du jour (renard, colporteur, loup, concours de tartes…) et calendrier
+- `dialogue.ts` : répliques par métier, phrases selon la situation, échanges amicaux, amoureux, hostiles
+- `events.ts` : événements du jour (renard, colporteur, loup, concours de tartes…) et calendrier
   (marché le mercredi, pique-nique le dimanche)
--  : sujets, brouillons, critiques (la gazette raconte d’abord ce qui s’est vraiment passé)
--  : chansons du barde, annonces du crieur
+- `gazette.ts` : sujets, brouillons, critiques (la gazette raconte d’abord ce qui s’est vraiment passé)
+- `verses.ts` : chansons du barde, annonces du crieur
 
 ## Le village vit tout seul
 
