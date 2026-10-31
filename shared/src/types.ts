@@ -248,6 +248,8 @@ export interface WorldState {
     model?: string;
     /** Fournisseurs utilisables tout de suite (clé API présente, Ollama joignable). */
     available?: Record<LLMProviderName, boolean>;
+    /** Fin de la clé API enregistrée (ex. « …a1b2 »), pour l'afficher sans la révéler. */
+    keyHint?: string;
     budget: LLMBudget;
   };
 }

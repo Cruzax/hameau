@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // .env à la racine du projet (facultatif). Les variables déjà définies l'emportent.
-const envFile = resolve(import.meta.dirname, '../../../.env');
+export const ENV_FILE = resolve(import.meta.dirname, '../../../.env');
+const envFile = ENV_FILE;
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 /** Relit .env sans redémarrer : une clé ajoutée en cours de partie devient utilisable. */

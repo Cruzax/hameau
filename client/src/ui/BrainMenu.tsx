@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LLMProviderName } from '@hameau/shared';
 import { useHameau } from '../net/store';
 
@@ -16,6 +16,12 @@ export function BrainMenu() {
   const send = useHameau((s) => s.send);
   const connected = useHameau((s) => s.connected);
   const [open, setOpen] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [editingKey, setEditingKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Dernier retour du serveur sur la clé ou le fournisseur (succès ou erreur).
+  const feedback = useHameau((s) => [...s.events].reverse().find((e) => e.type === 'llm.config'));
+  useEffect(() => setSaving(false), [feedback?.seq]);
   const [model, setModel] = useState(llm.provider === 'anthropic' && llm.model ? llm.model : CLAUDE_MODELS[0][0]);
   const b = llm.budget;
   const available = llm.available ?? { mock: true, anthropic: false, ollama: false };
@@ -61,20 +67,53 @@ export function BrainMenu() {
                 Activer
               </button>
             </div>
-            {!available.anthropic && (
-              <em>
-                Clé absente : copie <code>.env.example</code> en <code>.env</code> et remplis <code>ANTHROPIC_API_KEY</code>, puis{' '}
-                <button className="brain__link" onClick={() => send({ type: 'llm.config', provider: 'anthropic', model })}>
-                  revérifie
+            {llm.keyHint && !editingKey ? (
+              <div className="brain__key">
+                🔑 Clé enregistrée ({llm.keyHint})
+                <button className="brain__link" onClick={() => setEditingKey(true)}>changer</button>
+                <button className="brain__link" onClick={() => send({ type: 'llm.key', key: null })}>effacer</button>
+              </div>
+            ) : (
+              <form
+                className="brain__keyform"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!keyInput.trim()) return;
+                  setSaving(true);
+                  send({ type: 'llm.key', key: keyInput.trim() });
+                  setKeyInput('');
+                  setEditingKey(false);
+                }}
+              >
+                <label>
+                  Ta clé API (sk-ant-…)
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={keyInput}
+                    placeholder="sk-ant-api03-…"
+                    onChange={(e) => setKeyInput(e.target.value)}
+                  />
+                </label>
+                <button type="submit" disabled={!connected || saving || !keyInput.trim()}>
+                  {saving ? 'Vérification…' : 'Enregistrer'}
                 </button>
-                .
-              </em>
+                <span className="brain__small">
+                  Elle reste sur ton PC (fichier <code>.env</code>, jamais commité). Pour en créer une : console.anthropic.com → API Keys.
+                </span>
+              </form>
             )}
+            {feedback && feedback.text.includes('Clé') && <em className={feedback.payload.ok ? 'is-ok' : ''}>{feedback.text}</em>}
           </div>
 
           <div className={`brain__opt ${llm.provider === 'ollama' ? 'is-current' : ''} ${available.ollama ? '' : 'is-off'}`}>
             <strong>🖥 Ollama (modèle local)</strong>
-            <span>Gratuit, tourne sur ton PC. Plus lent et moins fiable.</span>
+            <span>
+              Ollama est un logiciel gratuit qui fait tourner une IA open source (Llama, Mistral…) directement sur ton PC,
+              sans internet ni clé. Moins malin que Claude et plus lent, surtout sans bonne carte graphique.
+              Pour l’essayer : installe-le depuis ollama.com, puis lance <code>ollama pull llama3.1</code>.
+            </span>
             <div className="brain__row">
               <button disabled={!connected || !available.ollama} onClick={() => choose('ollama')}>
                 Activer

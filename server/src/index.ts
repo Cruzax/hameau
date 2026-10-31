@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { SERVER_PORT, type ClientToServer, type LLMProviderName, type ServerToClient } from '@hameau/shared';
 import { LLM_CONFIG, reloadEnv } from './llm/config';
+import { keyHint, storeKey, verifyKey } from './llm/apiKey';
 import { createProvider } from './llm';
 import { Sim } from './sim/Sim';
 import { Journal } from './store/journal';
@@ -48,7 +49,28 @@ async function availability(): Promise<Record<LLMProviderName, boolean>> {
 
 async function refreshAvailability() {
   sim.world.llm.available = await availability();
+  sim.world.llm.keyHint = keyHint(process.env.ANTHROPIC_API_KEY);
   sim.touchLLM();
+}
+
+/** Formulaire « clé API » du site : vérifiée auprès d'Anthropic, puis écrite dans .env. */
+async function setApiKey(key: string | null) {
+  if (key === null) {
+    storeKey(null);
+    sim.emit('llm.config', [], '🔑 Clé API effacée.', { ok: true });
+    if (sim.world.llm.provider === 'anthropic') sim.onLLMConfig?.({ type: 'llm.config', provider: 'mock' });
+  } else {
+    const clean = key.trim();
+    const error = /^sk-ant-[\w-]{20,}$/.test(clean) ? await verifyKey(clean) : 'ça ne ressemble pas à une clé Anthropic (elle commence par sk-ant-)';
+    if (error) {
+      sim.emit('llm.config', [], `⚠️ Clé API non enregistrée : ${error}.`, { ok: false });
+      sim.touchLLM();
+      return;
+    }
+    storeKey(clean);
+    sim.emit('llm.config', [], '🔑 Clé API vérifiée et enregistrée dans .env. Claude est disponible.', { ok: true });
+  }
+  await refreshAvailability();
 }
 
 // Menu « cerveau des agents » : on change de fournisseur sans redémarrer la simulation.
@@ -88,13 +110,20 @@ const http = createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server: http });
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   clients.add(ws);
   const hello: ServerToClient = { type: 'snapshot', world: sim.world, events: journal.events.slice(-200) };
   ws.send(JSON.stringify(hello));
+  // La clé ne peut être envoyée que depuis ce PC, jamais depuis un autre appareil du réseau.
+  const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
   ws.on('message', (raw) => {
     try {
-      sim.command(JSON.parse(String(raw)) as ClientToServer);
+      const cmd = JSON.parse(String(raw)) as ClientToServer;
+      if (cmd.type === 'llm.key') {
+        if (local) void setApiKey(cmd.key);
+        return;
+      }
+      sim.command(cmd);
     } catch (e) {
       console.warn('Commande invalide', e);
     }
