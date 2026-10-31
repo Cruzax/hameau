@@ -74,6 +74,26 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
       case 'gazette.published':
         put(e.actors[0], e.text.replace(/^📰\s*/, ''), 'news');
         break;
+      // Vie quotidienne : ce qu'on se dit de vive voix, ce qu'on chante, ce qu'on annonce.
+      case 'life.meet':
+      case 'rumor.spread':
+        put(e.actors[0], String(p.body ?? ''), 'say');
+        break;
+      case 'song':
+      case 'rumor.announce':
+        put(e.actors[0], String(p.body ?? e.text), 'news');
+        break;
+      case 'life.trade':
+      case 'life.work':
+      case 'health.sick':
+      case 'health.healed':
+      case 'repair.done':
+      case 'crime.theft':
+      case 'crime.investigate':
+      case 'trial.opened':
+      case 'trial.verdict':
+        put(e.actors[0], e.text.replace(/^\S+\s/, ''), e.type.startsWith('trial') || e.type === 'crime.theft' ? 'news' : 'think');
+        break;
     }
   }
   return next;

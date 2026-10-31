@@ -1,4 +1,4 @@
-import { ROLE_COLOR, ROLE_LABEL } from '@hameau/shared';
+import { ROLE_COLOR, ROLE_LABEL, type Agent, type WorldState } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { Panel } from './Panel';
 import { useUI } from './uiStore';
@@ -10,11 +10,32 @@ function opinionColor(x: number) {
   return `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
 }
 
+/** Ce que fait l'habitant en ce moment, en quelques mots. */
+function doing(w: WorldState, a: Agent): string {
+  if (a.asleep) return '💤 dort';
+  const l = a.location;
+  const where = (place: string) => {
+    if (place === 'place') return 'la place';
+    const owner = w.agents[w.houses[place]?.ownerId ?? ''];
+    return owner ? `chez ${owner.name}` : 'une maison vide';
+  };
+  if (l?.kind === 'walking') return l.to === a.houseId ? '🚶 rentre' : `🚶 vers ${where(l.to)}`;
+  if (l?.kind === 'at') return `📍 ${where(l.place)}`;
+  return a.activity === 'thinking' ? '💭 réfléchit' : '🏠 chez soi';
+}
+
+function Bar({ value, color, title }: { value: number; color: string; title: string }) {
+  return (
+    <span className="bar" title={`${title} : ${Math.round(value * 100)} %`}>
+      <span style={{ width: `${Math.round(value * 100)}%`, background: value < 0.25 ? '#c8553d' : color }} />
+    </span>
+  );
+}
+
 /** Qui vit au village : rôle, maire, couple, enfant. Un clic cadre la caméra sur sa maison. */
 export function Habitants() {
-  const agents = useHameau((s) => s.world.agents);
-  const mayorId = useHameau((s) => s.world.mayorId);
-  const roads = useHameau((s) => s.world.roads);
+  const world = useHameau((s) => s.world);
+  const { agents, mayorId, roads } = world;
   const setUI = useUI((s) => s.set);
   const openRoads = Object.values(roads).filter((r) => r.status === 'open').length;
 
@@ -35,8 +56,22 @@ export function Habitants() {
                 {mayorId === a.id && <span title="Maire">👑</span>}
                 {a.family?.partnerId && agents[a.family.partnerId] && <span title={`En couple avec ${agents[a.family.partnerId].name}`}>💞</span>}
                 {a.family?.parentIds.length ? <span title="Enfant du village">👶</span> : null}
-                {a.activity === 'thinking' && <span title="Réfléchit">💭</span>}
+                {a.needs && a.needs.sante < 0.5 && <span title="Malade">🤒</span>}
               </span>
+              {a.needs && (
+                <span className="person__details">
+                  <span className="person__bars">
+                    <Bar value={a.needs.satiete} color="#d99a4a" title="Satiété" />
+                    <Bar value={a.needs.energie} color="#5a9ad0" title="Énergie" />
+                    <Bar value={a.needs.humeur} color="#5a9a4a" title="Humeur" />
+                    <Bar value={a.needs.sante} color="#c66a8a" title="Santé" />
+                  </span>
+                  <span className="person__inv">
+                    {a.inventory && `🥖${a.inventory.pain} 🪵${a.inventory.bois} 🔨${a.inventory.outils} 🪙${a.inventory.pieces}`}
+                  </span>
+                  <span className="person__doing">{doing(world, a)}</span>
+                </span>
+              )}
             </button>
           </li>
         ))}

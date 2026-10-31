@@ -11,7 +11,8 @@ async function replayFrom(seq: number) {
   startReplay((await res.json()) as SimEvent[], seq);
 }
 
-const QUIET: SimEvent['type'][] = ['message.delivered', 'llm.call'];
+/** Lignes masquées par défaut (case « tout ») : trop fréquentes pour être lues. */
+const QUIET: SimEvent['type'][] = ['message.delivered', 'llm.call', 'life.trip', 'life.trade', 'agent.opinion'];
 
 /** Journal d'événements horodaté ; exportable en JSON pour scénariser les vidéos. */
 export function Journal() {

@@ -8,6 +8,8 @@ const CAPTIONED: SimEvent['type'][] = [
   'vote.opened', 'vote.closed', 'mayor.elected', 'road.cut', 'road.added', 'road.built',
   'god.inject', 'agent.added', 'agent.left', 'day.start',
   'couple.formed', 'couple.split', 'agent.born', 'house.built', 'world.effect',
+  'life.meet', 'rumor.spread', 'rumor.announce', 'crime.theft', 'crime.investigate', 'trial.opened', 'trial.verdict',
+  'health.sick', 'health.healed', 'repair.done', 'song', 'party',
 ];
 const HOLD_MS = 4200;
 

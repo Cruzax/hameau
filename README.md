@@ -47,6 +47,32 @@ Dans le mode Dieu : ⛈ **orage** (pluie, ciel sombre, éclairs, messagers ralen
 déborde et submerge les ponts, coupés jusqu’à la décrue), ✨ **puits** (colonne de lumière dorée). Un événement
 tapé à la main qui parle d’orage, de crue ou de trésor déclenche aussi l’animation.
 
+## Les habitants
+
+| Habitant | Métier | Ce qu'il fait |
+|---|---|---|
+| Maxence | Maire | Coordonne la gazette, lève l'impôt, paie les salaires |
+| Enzo, Marie, Evan, Cruz | Éclaireur, écrivain, éditeur, lecteur | Font la gazette ; coupent du bois le matin |
+| Léonie | Boulangère | Cuit le pain (6 pains par bûche), le vend 1 pièce, en offre à qui n'a plus rien |
+| Bastien | Forgeron | Fabrique des outils, répare les routes emportées par la crue |
+| Céleste | Herboriste | Soigne les malades (2 pièces, ou à crédit) |
+| Gaston | Crieur public | Annonce les nouvelles sur la place à 9 h : le seul qui parle à tout le village |
+| Odette | Aubergiste | Sert à boire et à manger le soir ; on y bavarde |
+| Victor | Garde | Enquête sur les vols, accuse, organise les procès |
+| Ambroise | Barde | Chante chaque soir l'événement marquant de la journée |
+| Félix | « Vagabond » | Voleur en secret : il se glisse chez les autres la nuit |
+
+**Une journée** dure 24 h de jeu (2 min à ×1) : travail le matin, courses et visites l'après-midi,
+auberge le soir, sommeil de 22 h à 6 h. Chacun a des **besoins** (faim, énergie, humeur, santé) et un
+**inventaire** (pain, bois, outils, pièces), visibles dans la fenêtre Habitants. Les habitants **marchent**
+de lieu en lieu par les routes ; au même endroit, ils se parlent, se transmettent des **rumeurs** (que les
+menteurs déforment), se disputent. Les **vols** ont parfois des témoins ; le garde enquête puis accuse, et le
+village vote au **procès** : le coupable désigné n'est pas toujours le bon. Couples et naissances donnent
+lieu à une **fête** sur la place.
+
+Toute cette vie quotidienne fonctionne par règles (gratuites) ; l'IA n'est appelée que pour les messages,
+la gazette et les votes, et elle connaît l'état de chacun (faim, argent, rumeurs entendues).
+
 ## Le village vit tout seul
 
 Chaque soir : les voisins se rapprochent, des couples se forment (ou rompent), des enfants naissent puis

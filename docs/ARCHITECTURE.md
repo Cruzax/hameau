@@ -96,6 +96,7 @@ Le client ne fait que **rendre** : il interpole les messagers entre deux ticks e
 4. ✅ Votes et destitution — opinions qui évoluent (décisions des agents + humeur du soir), conseil tous les N jours, bulletins portés par messagers jusqu’à la maison du maire, majorité absolue, passation (l’ancien maire devient citoyen).
 5. ✅ Panneau Dieu (routes, événements, habitants, conseil, opinions), capture 9:16 avec plans de caméra et sous-titres, replay depuis le journal.
 6. ✅ Vie du village : couples, naissances, maisons, routes demandées au maire, arrivées et départs (voir ci-dessous).
+7. ✅ Vie quotidienne : 8 nouveaux métiers, journée de 24 h, besoins, économie, déplacements à pied, rumeurs, justice, fêtes, chansons (`server/src/sim/daily.ts`, `paths.ts`, `rumors.ts`, `justice.ts`).
 
 ## Vie du village (phase 6)
 

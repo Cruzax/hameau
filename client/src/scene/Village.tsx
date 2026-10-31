@@ -2,7 +2,6 @@ import { OrbitControls } from '@react-three/drei';
 import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Color, Fog, type DirectionalLight, type HemisphereLight } from 'three';
-import { ROLE_COLOR } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { Terrain } from './Terrain';
 import { River } from './River';
@@ -10,11 +9,10 @@ import { Plaza } from './Plaza';
 import { Roads } from './Roads';
 import { House } from './House';
 import { Trees } from './Trees';
-import { Villager } from './Villager';
 import { Messengers } from './Messengers';
 import { Bubbles } from './Bubbles';
-import { residentSpot } from './spots';
 import { CameraDirector } from './CameraDirector';
+import { Residents } from './Residents';
 import { Storm } from './Storm';
 import { Flood } from './Flood';
 import { WellGlow } from './WellGlow';
@@ -115,18 +113,7 @@ export function Village() {
         return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} />;
       })}
 
-      {/* Chaque habitant devant sa porte ; les enfants (qui vivent chez leurs parents) à côté, en plus petit. */}
-      {Object.values(agents).map((a, i) => {
-        const h = housesById[a.houseId];
-        if (!h) return null;
-        const guests = Object.values(agents).filter((x) => x.houseId === h.id && x.id !== h.ownerId);
-        const slot = h.ownerId === a.id ? 0 : guests.indexOf(a) + 1;
-        return (
-          <group key={a.id}>
-            <Villager position={residentSpot(h, slot)} heading={h.rotation} color={ROLE_COLOR[a.role]} phase={i * 1.3} scale={slot ? 0.7 : 1} />
-          </group>
-        );
-      })}
+      <Residents />
 
       <Storm />
       <CameraDirector />
