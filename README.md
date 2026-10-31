@@ -73,6 +73,17 @@ lieu à une **fête** sur la place.
 Toute cette vie quotidienne fonctionne par règles (gratuites) ; l'IA n'est appelée que pour les messages,
 la gazette et les votes, et elle connaît l'état de chacun (faim, argent, rumeurs entendues).
 
+## Contenu sans IA
+
+Tout ce qui suit est écrit à la main dans [](server/src/content/) ; ajouter une ligne
+suffit pour enrichir le village :
+
+-  : répliques par métier, phrases selon la situation, échanges amicaux, amoureux, hostiles
+-  : événements du jour (renard, colporteur, loup, concours de tartes…) et calendrier
+  (marché le mercredi, pique-nique le dimanche)
+-  : sujets, brouillons, critiques (la gazette raconte d’abord ce qui s’est vraiment passé)
+-  : chansons du barde, annonces du crieur
+
 ## Le village vit tout seul
 
 Chaque soir : les voisins se rapprochent, des couples se forment (ou rompent), des enfants naissent puis
