@@ -130,6 +130,7 @@ export class Sim {
 
   private startDay() {
     this.emit('day.start', [], `☀️ Jour ${this.clock.day} — le village se réveille.`);
+    this.daily.morning(this);
     this.brain.onDayStart(this);
   }
 

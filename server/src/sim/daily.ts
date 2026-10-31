@@ -152,7 +152,6 @@ export class Daily {
     const night = isNight(sim.clock);
     const agents = Object.values(sim.world.agents);
 
-    if (this.at(sim, 6)) this.morning(sim);
     for (const t of this.todays) {
       if (t.done || !this.at(sim, t.hour)) continue;
       t.done = true;
@@ -225,7 +224,8 @@ export class Daily {
 
   // ─── Matin : production ───────────────────────────────────────────────────
 
-  private morning(sim: Sim) {
+  /** Appelé par la simulation à chaque début de journée (6 h), y compris au tout premier jour. */
+  morning(sim: Sim) {
     const mayor = sim.agent(sim.world.mayorId);
     if (mayor) this.inv(mayor).pieces += 3; // le domaine du village rapporte un peu chaque jour
     for (const a of Object.values(sim.world.agents)) {
