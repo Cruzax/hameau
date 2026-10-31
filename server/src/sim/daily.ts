@@ -34,7 +34,9 @@ const BREAD_FILLS = 0.6;          // satiété rendue par un pain
 const RETRY_TICKS = 60;           // après un achat raté, on attend avant de retenter
 
 /** Qui coupe du bois le matin (les métiers sans production propre). */
-const WOODCUTTERS: Role[] = ['CITOYEN', 'ECLAIREUR', 'LECTEUR', 'VOLEUR', 'MENTEUR', 'BARDE', 'ECRIVAIN'];
+const WOODCUTTERS: Role[] = ['CITOYEN', 'ECLAIREUR', 'LECTEUR', 'VOLEUR', 'MENTEUR', 'BARDE', 'ECRIVAIN', 'EDITEUR'];
+/** Payés par le maire chaque matin, pour l'entretien du village. */
+const SALARIED: Role[] = ['CRIEUR', 'GARDE', 'FORGERON'];
 
 const SMALL_TALK: Partial<Record<Role, string[]>> = {
   MAIRE: ['Le village tient debout grâce à moi.', 'Tu as lu la gazette ?'],
@@ -244,13 +246,14 @@ export class Daily {
       } else if (WOODCUTTERS.includes(a.role) && Math.random() < 0.7) {
         inv.bois += 1 + (Math.random() < 0.4 ? 1 : 0);
       }
-      // Impôt : une pièce pour ceux qui en ont assez, versée au maire (qui paie les salaires).
+      // Impôt progressif : un dixième de ce qui dépasse le seuil, versé au maire (qui paie les salaires).
       if (mayor && a.id !== mayor.id && inv.pieces > TAX_THRESHOLD) {
-        inv.pieces--;
-        this.inv(mayor).pieces++;
+        const tax = Math.ceil((inv.pieces - TAX_THRESHOLD) / 10);
+        inv.pieces -= tax;
+        this.inv(mayor).pieces += tax;
       }
       // Salaires : le maire paie le crieur et le garde chaque matin, s'il en a les moyens.
-      if ((a.role === 'CRIEUR' || a.role === 'GARDE') && mayor && mayor.id !== a.id) {
+      if (SALARIED.includes(a.role) && mayor && mayor.id !== a.id) {
         const mi = this.inv(mayor);
         if (mi.pieces >= 2) {
           mi.pieces -= 2;
@@ -279,9 +282,9 @@ export class Daily {
     if (!mayor) return;
     const mi = this.inv(mayor);
     for (const a of Object.values(sim.world.agents)) {
-      if (!['ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'].includes(a.role) || a.id === mayor.id || mi.pieces < 1) continue;
-      mi.pieces--;
-      this.inv(a).pieces++;
+      if (!['ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'].includes(a.role) || a.id === mayor.id || mi.pieces < 2) continue;
+      mi.pieces -= 2;
+      this.inv(a).pieces += 2;
     }
   }
 
@@ -589,7 +592,9 @@ export class Daily {
     const pick = (types: string[]) => [...today].reverse().find((e) => types.includes(e.type));
     const e = pick(['trial.verdict', 'mayor.elected', 'crime.theft', 'couple.formed', 'agent.born', 'world.effect', 'gazette.published', 'party']);
     if (!e) return 'rien ne s’est passé, et c’est déjà beaucoup';
-    return e.text.replace(/^[^\p{L}]+/u, '').replace(/[«»"]/g, '').replace(/[.!]+$/, '').toLowerCase().slice(0, 90);
+    // Première phrase seulement, coupée proprement à un mot.
+    const sentence = e.text.replace(/^[^\p{L}]+/u, '').replace(/[«»"]/g, '').split(/[!.:]/)[0].trim().toLowerCase();
+    return sentence.length <= 70 ? sentence : sentence.slice(0, sentence.lastIndexOf(' ', 70));
   }
 
   private tavernSong(sim: Sim) {
