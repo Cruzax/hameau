@@ -17,7 +17,9 @@ export function Controls() {
   return (
     <div className="controls">
       <span className={`controls__dot ${connected ? 'is-on' : ''}`} title={connected ? 'Simulation connectée' : 'Serveur hors ligne'} />
-      <span className="controls__time">{villageTime(clock.tick, clock.ticksPerDay)}</span>
+      <span className="controls__time">
+        Jour {clock.day} · {villageTime(clock.tick, clock.ticksPerDay)}
+      </span>
       <button disabled={!connected} onClick={() => send({ type: clock.paused ? 'god.resume' : 'god.pause' })}>
         {clock.paused ? '▶' : '⏸'}
       </button>

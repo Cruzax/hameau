@@ -77,7 +77,8 @@ export default function App() {
         <Canvas shadows dpr={captureDpr ?? [1, 2]} orthographic camera={{ position: [40, 38, 40], zoom: 22, near: 0.1, far: 500 }}>
           <Village />
         </Canvas>
-        <TitleBanner day={day} />
+        {/* Le bandeau ne sert qu'en vidéo : en mode normal, le jour est dans la barre du haut. */}
+        {capture && <TitleBanner day={day} />}
         {capture && subtitles && <Captions />}
         {!capture && (
           <>
