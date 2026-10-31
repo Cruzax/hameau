@@ -22,6 +22,8 @@ export type ClientToServer =
   | { type: 'god.vote.force' }
   | { type: 'god.opinion'; who: AgentId; about: AgentId; delta: number }
   | { type: 'god.effect'; kind: EffectKind }
+  /** Recommence une histoire vierge. */
+  | { type: 'god.reset'; preset: 'complet' | 'origine' }
   /** Choix du cerveau des agents, en direct. */
   | { type: 'llm.config'; provider: LLMProviderName; model?: string }
   /** Enregistre (ou efface, avec null) la clé API Anthropic dans le .env local. Jamais renvoyée au client. */

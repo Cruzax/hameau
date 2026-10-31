@@ -228,6 +228,9 @@ export class Daily {
   morning(sim: Sim) {
     const mayor = sim.agent(sim.world.mayorId);
     if (mayor) this.inv(mayor).pieces += 3; // le domaine du village rapporte un peu chaque jour
+    // Sans boulangerie (village d'origine), chacun vit de son potager.
+    const hasBaker = Object.values(sim.world.agents).some((x) => x.role === 'BOULANGER');
+    if (!hasBaker) for (const x of Object.values(sim.world.agents)) this.inv(x).pain += 2;
     for (const a of Object.values(sim.world.agents)) {
       a.asleep = false;
       const inv = this.inv(a);

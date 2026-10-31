@@ -185,14 +185,27 @@ for (const a of SEED_AGENTS) for (const b of SEED_AGENTS) if (a.id !== b.id) a.o
 
 const byId = <T extends { id: string }>(xs: T[]) => Object.fromEntries(xs.map((x) => [x.id, x])) as Record<string, T>;
 
-export function createSeedWorld(): WorldState {
+/** Village de départ : complet (13 habitants) ou d'origine (les 5 qui font la gazette). */
+export type VillagePreset = 'complet' | 'origine';
+const ORIGINE: AgentId[] = ['maire', 'eclaireur', 'ecrivain', 'editeur', 'lecteur'];
+
+export function createSeedWorld(preset: VillagePreset = 'complet'): WorldState {
+  const keep = (id: AgentId) => preset === 'complet' || ORIGINE.includes(id);
+  const agents = SEED_AGENTS.filter((a) => keep(a.id)).map((a) => {
+    const copy = structuredClone(a);
+    copy.opinions = Object.fromEntries(Object.entries(copy.opinions).filter(([id]) => keep(id)));
+    return copy;
+  });
+  const houses = SEED_HOUSES.filter((h) => !h.ownerId || keep(h.ownerId));
+  const ids = new Set(houses.map((h) => h.id));
+  const roads = SEED_ROADS.filter((r) => ids.has(r.a) && ids.has(r.b));
   return {
     clock: { tick: 0, day: 1, ticksPerDay: 480, tickMs: 250, speed: 1, paused: false },
     terrain: TERRAIN,
     mayorId: 'maire',
-    agents: byId(structuredClone(SEED_AGENTS)),
-    houses: byId(structuredClone(SEED_HOUSES)),
-    roads: byId(structuredClone(SEED_ROADS)),
+    agents: byId(agents),
+    houses: byId(structuredClone(houses)),
+    roads: byId(structuredClone(roads)),
     messages: {},
     gazettes: [],
     votes: [],

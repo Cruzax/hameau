@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLayout, type PanelId } from './layoutStore';
 import { useUI, type CameraShot } from './uiStore';
+import { useHameau } from '../net/store';
 
 interface MenuItem {
   id: string;
@@ -41,6 +42,16 @@ export function Sidebar() {
   const { toggle, reset } = useLayout.getState();
   const shot = useUI((s) => s.shot);
   const setUI = useUI((s) => s.set);
+  const send = useHameau((s) => s.send);
+  const connected = useHameau((s) => s.connected);
+
+  /** Recommencer efface l'histoire en cours : on demande confirmation. */
+  const restart = (preset: 'complet' | 'origine', what: string) => {
+    if (!connected) return;
+    if (window.confirm(`Recommencer une histoire vierge avec ${what} ? L’histoire en cours sera perdue (son journal reste dans le dossier data/).`)) {
+      send({ type: 'god.reset', preset });
+    }
+  };
 
   const sections: MenuSection[] = [
     {
@@ -58,6 +69,13 @@ export function Sidebar() {
     {
       title: 'Vidéo',
       items: [{ id: 'capture', icon: '🎬', label: 'Mode capture 9:16', shortcut: 'C', onClick: () => setUI({ capture: true, shot: 'survol' }) }],
+    },
+    {
+      title: 'Partie',
+      items: [
+        { id: 'reset-origine', icon: '🏡', label: 'Recommencer : 5 premiers habitants', onClick: () => restart('origine', 'les 5 habitants du début') },
+        { id: 'reset-complet', icon: '🔄', label: 'Recommencer : village complet', onClick: () => restart('complet', 'le village complet (13 habitants)') },
+      ],
     },
     {
       title: 'Disposition',

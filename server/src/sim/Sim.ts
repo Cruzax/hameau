@@ -1,5 +1,6 @@
 import {
   createSeedWorld,
+  type VillagePreset,
   roadLength,
   type Agent,
   type AgentId,
@@ -64,10 +65,10 @@ export class Sim {
   private agentsDirty = false;
   private llmDirty = false;
   private timer: NodeJS.Timeout | null = null;
-  readonly politics = new Politics();
-  readonly life = new Life();
+  politics = new Politics();
+  life = new Life();
   /** Vie quotidienne : besoins, métiers, déplacements, rumeurs, justice. */
-  readonly daily = new Daily();
+  daily = new Daily();
   /** Vie du village (couples, naissances, constructions…). Désactivable avec LIFE_ENABLED=false. */
   lifeEnabled = process.env.LIFE_ENABLED !== 'false';
   private nextMsgId = 1;
@@ -413,6 +414,9 @@ export class Sim {
       case 'god.vote.force':
         if (!this.politics.current(this)) this.politics.open(this, true);
         break;
+      case 'god.reset':
+        this.reset(c.preset);
+        return;
       case 'god.opinion':
         this.adjustOpinion(c.who, c.about, c.delta, c.delta < 0 ? 'Une petite voix me souffle de m’en méfier…' : 'Une petite voix me dit de lui faire confiance.');
         break;
@@ -422,6 +426,36 @@ export class Sim {
 
   /** Branché par index.ts pour changer de fournisseur LLM en direct. */
   onLLMConfig?: (c: Extract<ClientToServer, { type: 'llm.config' }>) => void;
+
+  /**
+   * Histoire vierge : village de départ (complet ou d'origine), jour 1 à 6 h, journal neuf.
+   * Le choix de l'IA et ses garde-fous sont conservés ; les compteurs repartent à zéro.
+   */
+  reset(preset: VillagePreset) {
+    const fresh = createSeedWorld(preset);
+    const llm = this.world.llm;
+    const voteEveryDays = this.world.voteEveryDays;
+    const speed = this.clock.speed;
+    for (const k of Object.keys(this.world)) delete (this.world as unknown as Record<string, unknown>)[k];
+    Object.assign(this.world, fresh, {
+      voteEveryDays,
+      llm: { ...llm, budget: { ...llm.budget, callsToday: 0, tokensIn: 0, tokensOut: 0 } },
+    });
+    this.clock.speed = speed;
+    this.pending.length = 0;
+    this.outbox = [];
+    this.nextMsgId = 1;
+    this.politics = new Politics();
+    this.life = new Life();
+    this.daily = new Daily();
+    this.journal.restart();
+    this.broadcast({ type: 'snapshot', world: this.world, events: [] });
+    this.emit('god.inject', [], preset === 'origine'
+      ? '🔄 Nouvelle histoire : le hameau d’origine, ses cinq habitants et sa gazette.'
+      : '🔄 Nouvelle histoire : le village au complet.', { reset: preset });
+    this.startDay();
+    this.flush();
+  }
 
   broadcastPatch(world: Partial<WorldState>) {
     this.broadcast({ type: 'patch', world });
