@@ -3,7 +3,9 @@ import type { Sim } from './Sim';
 
 // Rumeurs : vraies ou fausses, elles passent de bouche en bouche et se déforment en route.
 
-export type RumorKind = 'rodeur' | 'voleur' | 'tricheur' | 'amoureux' | 'malade' | 'riche';
+export type RumorKind =
+  | 'rodeur' | 'voleur' | 'tricheur' | 'amoureux' | 'malade' | 'riche'
+  | 'dette' | 'secret' | 'fantome' | 'fugue' | 'complot' | 'sorcier';
 
 const TEMPLATES: Record<RumorKind, (about: string, target?: string) => string> = {
   rodeur: (a, t) => `${a} rôdait près de chez ${t ?? 'quelqu’un'} cette nuit`,
@@ -12,9 +14,17 @@ const TEMPLATES: Record<RumorKind, (about: string, target?: string) => string> =
   amoureux: (a, t) => `${a} en pince pour ${t ?? 'quelqu’un'}`,
   malade: (a) => `${a} est plus malade qu’il n’y paraît`,
   riche: (a) => `${a} cache un trésor sous son lit`,
+  dette: (a, t) => `${a} doit une fortune à ${t ?? 'quelqu’un'}`,
+  secret: (a) => `${a} cache quelque chose dans sa cave`,
+  fantome: (a) => `${a} parle aux fantômes du vieux moulin`,
+  fugue: (a) => `${a} prépare son départ du village en secret`,
+  complot: (a) => `${a} complote pour devenir maire`,
+  sorcier: (a) => `${a} prépare des potions la nuit`,
 };
 /** Rumeurs qui font baisser l'estime de la personne visée. */
-const HARMFUL: RumorKind[] = ['rodeur', 'voleur', 'tricheur', 'riche'];
+const HARMFUL: RumorKind[] = ['rodeur', 'voleur', 'tricheur', 'riche', 'dette', 'secret', 'complot', 'sorcier'];
+/** Ce qu'un menteur peut inventer sur quelqu'un qu'il n'aime pas. */
+export const SLANDERS: RumorKind[] = ['voleur', 'tricheur', 'dette', 'secret', 'complot', 'sorcier', 'fantome'];
 const MAX_RUMORS = 40;
 
 interface RumorExt extends Rumor { kind: RumorKind; target?: AgentId }

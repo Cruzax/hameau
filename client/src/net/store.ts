@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createSeedWorld, type AgentId, type ClientToServer, type SimEvent, type WorldState } from '@hameau/shared';
 
-export type BubbleKind = 'say' | 'think' | 'news';
+export type BubbleKind = 'say' | 'think' | 'news' | 'emote';
 
 export interface Bubble {
   id: number;
@@ -48,6 +48,13 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
   const put = (agentId: AgentId | undefined, text: string, kind: BubbleKind) => {
     if (agentId) next[agentId] = { id: ++bubbleSeq, agentId, text, kind, until: now + life };
   };
+  // Petite émoticône, seulement si l'habitant ne parle pas déjà.
+  const emote = (agentId: AgentId | undefined, icon: string) => {
+    if (!agentId) return;
+    const cur = next[agentId];
+    if (cur && cur.until > now && cur.kind !== 'emote') return;
+    next[agentId] = { id: ++bubbleSeq, agentId, text: icon, kind: 'emote', until: now + life * 0.6 };
+  };
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
     switch (e.type) {
@@ -66,7 +73,6 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
       case 'mayor.elected':
         put(e.actors[0], e.text.replace(/^👑\s*/, ''), 'news');
         break;
-      case 'couple.formed':
       case 'agent.born':
       case 'house.built':
         put(e.actors[0], e.text, 'news');
@@ -83,7 +89,19 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
       case 'rumor.announce':
         put(e.actors[0], String(p.body ?? e.text), 'news');
         break;
+      case 'couple.formed':
+        emote(e.actors[1], '❤️');
+        put(e.actors[0], e.text, 'news');
+        break;
+      case 'agent.opinion':
+        emote(e.actors[0], Number(p.after) > Number(p.before) ? '💚' : '💢');
+        break;
+      case 'life.hobby':
+        emote(e.actors[0], String(e.text).split(' ')[0]);
+        break;
       case 'life.trade':
+        emote(e.actors[0], p.item === 'bois' ? '🪵' : p.gift ? '🤲' : '🥖');
+        break;
       case 'life.work':
       case 'health.sick':
       case 'health.healed':

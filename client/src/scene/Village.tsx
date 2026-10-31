@@ -13,6 +13,7 @@ import { Messengers } from './Messengers';
 import { Bubbles } from './Bubbles';
 import { CameraDirector } from './CameraDirector';
 import { Residents } from './Residents';
+import { NatureSpots } from './NatureSpots';
 import { Storm } from './Storm';
 import { Flood } from './Flood';
 import { WellGlow } from './WellGlow';
@@ -113,6 +114,7 @@ export function Village() {
         return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} />;
       })}
 
+      <NatureSpots />
       <Residents />
 
       <Storm />

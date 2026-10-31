@@ -742,3 +742,8 @@ button.brain__opt { cursor: pointer; }
 .bar > span { display: block; height: 100%; border-radius: 3px; transition: width 0.4s; }
 .person__inv { font-variant-numeric: tabular-nums; }
 .person__doing { margin-left: auto; }
+
+/* Émoticône au-dessus d'une tête */
+.bubble--emote { padding: 2px 6px; font-size: 18px; border: 0 !important; background: rgba(255, 250, 240, 0.85); box-shadow: 0 2px 8px rgba(60, 35, 15, 0.18); animation: emote-pop 0.35s ease-out; }
+.bubble--emote::after { display: none; }
+@keyframes emote-pop { from { transform: translate(-50%, -60%) scale(0.4); opacity: 0; } to { transform: translate(-50%, -100%) scale(1); opacity: 1; } }

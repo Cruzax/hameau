@@ -19,6 +19,12 @@ export const TERRAIN: Terrain = {
   },
 };
 
+/** Coins de nature où l'on va à pied : la forêt (bois, cueillette) et la rive (pêche). */
+export const NATURE_SPOTS: Record<'foret' | 'riviere', Vec2> = {
+  foret: { x: -17, z: 16 },
+  riviere: { x: 6.6, z: 23 },
+};
+
 /** Libellés affichés au-dessus des maisons. */
 export const ROLE_LABEL: Record<Role, string> = {
   MAIRE: 'Maire',

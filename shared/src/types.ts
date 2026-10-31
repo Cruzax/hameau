@@ -35,7 +35,7 @@ export interface Inventory {
 }
 
 /** Lieu où l'on peut se rendre : la place du village, ou une maison (par son id). */
-export type PlaceId = 'place' | string;
+export type PlaceId = 'place' | 'foret' | 'riviere' | string;
 
 export type TripPurpose =
   | 'acheter' | 'vendre' | 'visite' | 'taverne' | 'fete' | 'travail' | 'soin'
@@ -231,7 +231,8 @@ export type SimEventType =
   | 'life.trip' | 'life.meet' | 'life.trade' | 'life.work' | 'life.need' | 'life.sleep'
   | 'rumor.spread' | 'rumor.announce'
   | 'crime.theft' | 'crime.investigate' | 'trial.opened' | 'trial.verdict'
-  | 'health.sick' | 'health.healed' | 'repair.done' | 'song' | 'party';
+  | 'health.sick' | 'health.healed' | 'repair.done' | 'song' | 'party'
+  | 'village.event' | 'calendar' | 'life.hobby';
 
 /** Une ligne du journal. Append-only, horodatée, rejouable : c'est le « script » des vidéos. */
 export interface SimEvent {

@@ -9,7 +9,7 @@ const CAPTIONED: SimEvent['type'][] = [
   'god.inject', 'agent.added', 'agent.left', 'day.start',
   'couple.formed', 'couple.split', 'agent.born', 'house.built', 'world.effect',
   'life.meet', 'rumor.spread', 'rumor.announce', 'crime.theft', 'crime.investigate', 'trial.opened', 'trial.verdict',
-  'health.sick', 'health.healed', 'repair.done', 'song', 'party',
+  'health.sick', 'health.healed', 'repair.done', 'song', 'party', 'village.event', 'life.hobby', 'calendar',
 ];
 const HOLD_MS = 4200;
 

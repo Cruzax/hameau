@@ -4,3 +4,4 @@ export * from './seed';
 export * from './geometry';
 export * from './providers';
 export * from './time';
+export * from './french';

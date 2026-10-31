@@ -1,5 +1,6 @@
 import {
   dayFraction,
+  que,
   isNight,
   villageHour,
   type Agent,
@@ -10,9 +11,13 @@ import {
   type TripPurpose,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
+import { isActive } from './effects';
 import { findPath } from './paths';
-import { createRumor, hottestRumor, rumorToShare, tellRumor } from './rumors';
+import { createRumor, hottestRumor, rumorToShare, SLANDERS, tellRumor } from './rumors';
 import { Justice } from './justice';
+import { chooseExchange, MUSINGS } from '../content/dialogue';
+import { CALENDAR, dayName, EVENTS, helpers, type VillageEvent } from '../content/events';
+import { CRIER_EXTRAS, SONGS } from '../content/verses';
 
 // Vie quotidienne : besoins, métiers, commerce, déplacements à pied, rencontres, fêtes, chansons.
 // Tout est réglé par des règles simples et gratuites : aucun appel à l'IA ici.
@@ -38,28 +43,6 @@ const WOODCUTTERS: Role[] = ['CITOYEN', 'ECLAIREUR', 'LECTEUR', 'VOLEUR', 'MENTE
 /** Payés par le maire chaque matin, pour l'entretien du village. */
 const SALARIED: Role[] = ['CRIEUR', 'GARDE', 'FORGERON'];
 
-const SMALL_TALK: Partial<Record<Role, string[]>> = {
-  MAIRE: ['Le village tient debout grâce à moi.', 'Tu as lu la gazette ?'],
-  BOULANGER: ['Le four a chanté ce matin !', 'Encore des miettes chez moi, c’est louche.'],
-  FORGERON: ['Ça tient. Ça tiendra.', 'Le pont a besoin d’un coup de marteau.'],
-  HERBORISTE: ['Bois une tisane, tu as mauvaise mine.', 'Je sais des choses, tu sais.'],
-  CRIEUR: ['Tu connais la dernière ?', 'OYEZ ! Enfin… entre nous.'],
-  AUBERGISTE: ['Une chope, comme d’habitude ?', 'On m’en raconte de belles, ici.'],
-  GARDE: ['Où étais-tu cette nuit ?', 'Rien ne m’échappe.'],
-  BARDE: ['J’ai une rime pour toi : « hameau, rameau, chameau ».', 'Ta vie mérite une chanson.'],
-  VOLEUR: ['Belle soirée, n’est-ce pas ?', 'Moi ? Je ne fais que passer.'],
-  ECRIVAIN: ['Je cherche l’article du siècle.', 'Les mots me fuient aujourd’hui.'],
-  EDITEUR: ['Trop long.', 'Sois bref.'],
-  ECLAIREUR: ['J’ai vu un truc fou près de la rivière !', 'Il se passe toujours quelque chose.'],
-  LECTEUR: ['On ne m’écoute jamais, de ce côté du pont.', 'La gazette d’hier ? Bof.'],
-};
-
-const SONG_LINES = [
-  (t: string) => `🎵 « Au hameau, l’on raconte encore / que ${t}… et que le pain n’est plus d’or ! »`,
-  (t: string) => `🎵 « Lève ta chope, mon voisin, / car ${t}, et demain, plus rien ! »`,
-  (t: string) => `🎵 « Ô rivière, ô moulin, / ${t}, et ça finira bien. »`,
-];
-
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 export class Daily {
@@ -68,6 +51,12 @@ export class Daily {
   /** Fête prévue : on rassemble le village sur la place à cette heure. */
   private party: { day: number; hour: number; reason: string } | null = null;
   private sangToday = false;
+  /** Tant que la forêt est « fermée » (loup), personne n'y va. */
+  forestClosedUntil = 0;
+  /** Événements du jour, avec leur heure. */
+  private todays: { hour: number; ev: VillageEvent; done: boolean }[] = [];
+  /** Qui est déjà allé couper du bois aujourd'hui. */
+  private cutToday = new Set<AgentId>();
   /** Prochain tick où l'habitant peut retenter un achat ou se plaindre de la faim. */
   private nextShop = new Map<AgentId, number>();
   private nextComplaint = new Map<AgentId, number>();
@@ -126,6 +115,8 @@ export class Daily {
 
   private placeName(sim: Sim, place: PlaceId) {
     if (place === 'place') return 'la place';
+    if (place === 'foret') return 'la forêt';
+    if (place === 'riviere') return 'la rivière';
     const owner = sim.world.houses[place]?.ownerId;
     const o = owner ? sim.agent(owner) : undefined;
     if (!o) return 'une maison vide';
@@ -162,6 +153,13 @@ export class Daily {
     const agents = Object.values(sim.world.agents);
 
     if (this.at(sim, 6)) this.morning(sim);
+    for (const t of this.todays) {
+      if (t.done || !this.at(sim, t.hour)) continue;
+      t.done = true;
+      if (t.ev.when && !t.ev.when(sim)) continue;
+      const text = t.ev.run(sim, helpers(sim));
+      if (text) sim.emit('village.event', [], text, { event: t.ev.id });
+    }
     if (this.at(sim, 12)) {
       const baker = this.byRole(sim, 'BOULANGER');
       if (baker) this.bake(sim, baker, 2);
@@ -243,8 +241,8 @@ export class Daily {
       } else if (a.role === 'FORGERON' && inv.bois > 0 && inv.outils < 5) {
         inv.bois--;
         inv.outils++;
-      } else if (WOODCUTTERS.includes(a.role) && Math.random() < 0.7) {
-        inv.bois += 1 + (Math.random() < 0.4 ? 1 : 0);
+      } else if (WOODCUTTERS.includes(a.role) && Math.random() < 0.15) {
+        inv.bois++; // une bûche ramassée près de chez soi
       }
       // Impôt progressif : un dixième de ce qui dépasse le seuil, versé au maire (qui paie les salaires).
       if (mayor && a.id !== mayor.id && inv.pieces > TAX_THRESHOLD) {
@@ -269,11 +267,13 @@ export class Daily {
     for (const a of Object.values(sim.world.agents)) {
       if ((a.role === 'MENTEUR' || a.role === 'VOLEUR') && Math.random() < 0.5) {
         const target = Object.keys(a.opinions).sort((x, y) => (a.opinions[x] ?? 0) - (a.opinions[y] ?? 0))[0];
-        if (target) createRumor(sim, a.id, Math.random() < 0.6 ? 'voleur' : 'tricheur', target, false);
+        const others = Object.keys(sim.world.agents).filter((id) => id !== target);
+        if (target) createRumor(sim, a.id, SLANDERS[Math.floor(Math.random() * SLANDERS.length)], target, false, others[Math.floor(Math.random() * others.length)]);
       }
     }
     this.justice.onMorning(sim);
     this.sangToday = false;
+    this.planDay(sim);
   }
 
   /** Une gazette parue : le maire verse une pièce à chacun de ceux qui l'ont faite. */
@@ -387,6 +387,21 @@ export class Daily {
     if (hour >= 18 && hour < 21 && inn && inn.id !== a.id) {
       const goes = a.role === 'BARDE' || (n.humeur > 0.3 && n.energie > 0.3 && inv.pieces >= TAVERN_PRICE && Math.random() < 0.3);
       if (goes && this.trip(sim, a, inn.houseId, 'taverne', 21.5 - hour)) return;
+    }
+
+    // Le matin, les bûcherons partent en forêt.
+    if (WOODCUTTERS.includes(a.role) && hour >= 7 && hour < 11 && !this.cutToday.has(a.id) && sim.clock.tick >= this.forestClosedUntil && Math.random() < 0.35) {
+      this.cutToday.add(a.id);
+      if (this.trip(sim, a, 'foret', 'travail', 1.5)) return;
+    }
+
+    // L'après-midi, chacun son loisir : pêche, cueillette, promenade… ou une pensée à la fenêtre.
+    if (hour >= 14 && hour < 17 && Math.random() < 0.1) {
+      const hobby = this.hobby(a);
+      if (hobby === 'peche' && this.trip(sim, a, 'riviere', 'promenade', 1.5)) return;
+      if ((hobby === 'cueillette' || hobby === 'promenade') && sim.clock.tick >= this.forestClosedUntil && this.trip(sim, a, 'foret', 'promenade', 1.2)) return;
+      const musings = MUSINGS[a.role];
+      if (musings && Math.random() < 0.4) sim.emit('agent.thought', [a.id], `💭 ${a.name} : ${musings[Math.floor(Math.random() * musings.length)]}`, { text: musings[Math.floor(Math.random() * musings.length)] });
     }
 
     // L'après-midi, une visite à quelqu'un qu'on apprécie (ou à son ou sa partenaire).
@@ -516,6 +531,29 @@ export class Daily {
         if (loss) this.justice.recordTheft(sim, a.id, owner.id, loss);
         break;
       }
+      case 'travail':
+        if (place === 'foret') {
+          const qty = 1 + (Math.random() < 0.5 ? 1 : 0) + (inv.outils > 0 ? 1 : 0);
+          inv.bois += qty;
+          sim.emit('life.work', [a.id], `🪓 ${a.name} coupe ${qty} bûche${qty > 1 ? 's' : ''} en forêt.`, { work: 'bois', qty });
+        }
+        break;
+      case 'promenade': {
+        const n = this.needs(a);
+        n.humeur = clamp01(n.humeur + 0.1);
+        if (place === 'riviere' && Math.random() < 0.55) {
+          const fish = ['une truite', 'un brochet', 'trois goujons', 'une anguille', 'une vieille botte'][Math.floor(Math.random() * 5)];
+          if (fish !== 'une vieille botte') n.satiete = clamp01(n.satiete + 0.35);
+          sim.emit('life.hobby', [a.id], `🎣 ${a.name} pêche ${fish} dans la rivière.`, { hobby: 'peche' });
+        } else if (place === 'foret' && a.role === 'HERBORISTE') {
+          inv.pieces += 1;
+          sim.emit('life.hobby', [a.id], `🌿 ${a.name} cueille des herbes rares en forêt.`, { hobby: 'cueillette' });
+        } else if (place === 'foret' && Math.random() < 0.35) {
+          const find = ['des champignons', 'des mûres', 'une plume de geai', 'des noisettes', 'un nid abandonné'][Math.floor(Math.random() * 5)];
+          sim.emit('life.hobby', [a.id], `🍄 ${a.name} trouve ${find} en se promenant en forêt.`, { hobby: 'promenade' });
+        }
+        break;
+      }
       case 'visite':
         this.needs(a).humeur = clamp01(this.needs(a).humeur + 0.05);
         break;
@@ -531,12 +569,16 @@ export class Daily {
     const w = sim.world;
     const lastGazette = w.gazettes[w.gazettes.length - 1];
     const rumor = hottestRumor(sim);
+    const today = dayName(sim.clock.day);
+    const roll = Math.random();
     const news =
-      rumor && Math.random() < 0.5
-        ? `on raconte que ${rumor.text} !`
-        : lastGazette
-          ? `la gazette du jour ${lastGazette.day} titre : « ${lastGazette.headline} » !`
-          : `le maire ${sim.agent(w.mayorId)?.name} veille sur vous !`;
+      CALENDAR[today] && roll < 0.3
+        ? `nous sommes ${today}, et c’est ${today === 'mercredi' ? 'jour de marché' : 'pique-nique sur la place'} !`
+        : rumor && roll < 0.55
+          ? `on raconte ${que(rumor.text)} !`
+          : lastGazette && roll < 0.8
+            ? `la gazette du jour ${lastGazette.day} titre : « ${lastGazette.headline} » !`
+            : `${CRIER_EXTRAS[Math.floor(Math.random() * CRIER_EXTRAS.length)]} !`;
     sim.emit('rumor.announce', [crier.id], `📯 ${crier.name} : « OYEZ, OYEZ ! ${news.toUpperCase()} »`, { body: news });
     for (const a of Object.values(w.agents)) {
       if (a.id === crier.id) continue;
@@ -573,13 +615,24 @@ export class Daily {
         sim.adjustOpinion(listener.id, speaker.id, -0.04);
       } else if (rumor && Math.random() < 0.7) {
         const told = tellRumor(sim, speaker, listener, rumor);
-        line = `Tu sais quoi ? Il paraît que ${told.text}.`;
-        sim.emit('rumor.spread', [speaker.id, listener.id], `🗣 ${speaker.name} glisse à ${listener.name} que ${told.text}.`, { rumorId: told.id, body: line, true: told.true });
+        line = `Tu sais quoi ? Il paraît ${que(told.text)}.`;
+        sim.emit('rumor.spread', [speaker.id, listener.id], `🗣 ${speaker.name} glisse à ${listener.name} ${que(told.text)}.`, { rumorId: told.id, body: line, true: told.true });
       } else {
-        const lines = SMALL_TALK[speaker.role] ?? ['Belle journée, non ?'];
-        line = lines[Math.floor(Math.random() * lines.length)];
-        sim.adjustOpinion(speaker.id, listener.id, 0.03);
-        sim.adjustOpinion(listener.id, speaker.id, 0.03);
+        const ex = chooseExchange({
+          speaker, listener, mutual, place: where, dayName: dayName(sim.clock.day),
+          night: isNight(sim.clock), storm: isActive(sim, 'storm'), flood: isActive(sim, 'flood'),
+          mayorName: sim.agent(sim.world.mayorId)?.name ?? '', mayorOpinion: speaker.opinions[sim.world.mayorId] ?? 0,
+        });
+        line = ex.line;
+        sim.adjustOpinion(speaker.id, listener.id, ex.bond);
+        sim.adjustOpinion(listener.id, speaker.id, ex.bond);
+        if (ex.reply) {
+          sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} à ${listener.name} (${where}) : « ${line} »`, { body: line, place });
+          line = '';
+          sim.emit('life.meet', [listener.id, speaker.id], `🗨 ${listener.name} répond : « ${ex.reply} »`, { body: ex.reply, place });
+          sim.remember(listener.id, speaker.id, 'in', ex.line);
+          continue;
+        }
       }
       sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} à ${listener.name} (${where}) : « ${line} »`, { body: line, place });
       sim.remember(listener.id, speaker.id, 'in', line);
@@ -590,7 +643,7 @@ export class Daily {
   private highlight(sim: Sim): string {
     const today = sim.journal.events.filter((e) => e.day === sim.clock.day);
     const pick = (types: string[]) => [...today].reverse().find((e) => types.includes(e.type));
-    const e = pick(['trial.verdict', 'mayor.elected', 'crime.theft', 'couple.formed', 'agent.born', 'world.effect', 'gazette.published', 'party']);
+    const e = pick(['trial.verdict', 'mayor.elected', 'crime.theft', 'couple.formed', 'agent.born', 'world.effect', 'village.event', 'party', 'gazette.published']);
     if (!e) return 'rien ne s’est passé, et c’est déjà beaucoup';
     // Première phrase seulement, coupée proprement à un mot.
     const sentence = e.text.replace(/^[^\p{L}]+/u, '').replace(/[«»"]/g, '').split(/[!.:]/)[0].trim().toLowerCase();
@@ -601,9 +654,51 @@ export class Daily {
     const bard = this.byRole(sim, 'BARDE');
     if (!bard || this.sangToday || bard.asleep || this.placeOf(bard) === bard.houseId) return;
     this.sangToday = true;
-    const song = SONG_LINES[Math.floor(Math.random() * SONG_LINES.length)](this.highlight(sim));
+    const song = SONGS[Math.floor(Math.random() * SONGS.length)](this.highlight(sim));
     sim.emit('song', [bard.id], `${bard.name} chante : ${song}`, { body: song });
     for (const a of this.presence(sim).get(this.placeOf(bard)!) ?? []) this.needs(a).humeur = clamp01(this.needs(a).humeur + 0.08);
+  }
+
+  /** Loisir attitré de chaque habitant (stable : déduit de son identifiant). */
+  private hobby(a: Agent): 'peche' | 'cueillette' | 'promenade' | 'maison' {
+    if (a.role === 'HERBORISTE') return 'cueillette';
+    const list = ['peche', 'promenade', 'maison', 'peche', 'cueillette', 'maison'] as const;
+    let h = 0;
+    for (const ch of a.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return list[h % list.length];
+  }
+
+  /** Programme les événements du jour et le rendez-vous du calendrier. */
+  private planDay(sim: Sim) {
+    this.cutToday.clear();
+    const pool = EVENTS.filter((e) => !e.when || e.when(sim));
+    const count = 1 + (Math.random() < 0.6 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0);
+    this.todays = [];
+    for (let i = 0; i < count && pool.length; i++) {
+      const total = pool.reduce((s, e) => s + e.weight, 0);
+      let r = Math.random() * total;
+      const ev = pool.find((e) => (r -= e.weight) <= 0) ?? pool[0];
+      pool.splice(pool.indexOf(ev), 1);
+      this.todays.push({ hour: ev.hour ?? 8 + Math.floor(Math.random() * 12), ev, done: false });
+    }
+    const today = dayName(sim.clock.day);
+    const cal = CALENDAR[today];
+    sim.emit('calendar', [], `📅 ${today[0].toUpperCase()}${today.slice(1)}, jour ${sim.clock.day}.`, { dayName: today });
+    if (cal) {
+      this.todays.push({
+        hour: cal.hour,
+        done: false,
+        ev: {
+          id: `calendrier-${today}`,
+          weight: 0,
+          run: (_s, h) => {
+            h.gather(cal.hour, cal.until);
+            h.moodAll(cal.mood);
+            return cal.text;
+          },
+        },
+      });
+    }
   }
 
   /** Une fête sur la place le lendemain à 17 h (mariage, naissance…). */

@@ -1,4 +1,4 @@
-import { dist, houseDoor, polylineLength, roadPath, type HouseId, type PlaceId, type Road, type Vec2, type WorldState } from '@hameau/shared';
+import { dist, houseDoor, NATURE_SPOTS, polylineLength, roadPath, type HouseId, type PlaceId, type Road, type Vec2, type WorldState } from '@hameau/shared';
 
 // Itinéraires à pied : les habitants marchent de maison en maison par les routes ouvertes.
 // La place du village est un nœud de plus, reliée aux maisons dont la route la traverse.
@@ -52,12 +52,26 @@ function graph(w: WorldState): Map<PlaceId, Edge[]> {
       add('place', { to: end, points: [...part].reverse(), length: l });
     }
   }
+  // Sentiers vers la nature, depuis les deux maisons habitées les plus proches.
+  for (const [spot, p] of Object.entries(NATURE_SPOTS)) {
+    const near = Object.values(w.houses)
+      .filter((h) => h.ownerId)
+      .sort((a, b) => dist(houseDoor(a), p) - dist(houseDoor(b), p))
+      .slice(0, 2);
+    for (const h of near) {
+      const pts = [houseDoor(h), p];
+      const l = dist(pts[0], p);
+      add(h.id, { to: spot, points: pts, length: l });
+      add(spot, { to: h.id, points: [p, pts[0]], length: l });
+    }
+  }
   return g;
 }
 
 /** Point d'arrivée concret d'un lieu (devant la porte, ou le centre de la place). */
 export function placePoint(w: WorldState, place: PlaceId): Vec2 | null {
   if (place === 'place') return w.terrain.plaza.center;
+  if (place === 'foret' || place === 'riviere') return NATURE_SPOTS[place];
   const h = w.houses[place];
   return h ? houseDoor(h) : null;
 }

@@ -1,4 +1,4 @@
-import { distToPolyline, houseDoor, pointAlong, type Agent, type House, type WorldState } from '@hameau/shared';
+import { distToPolyline, houseDoor, NATURE_SPOTS, pointAlong, type Agent, type House, type WorldState } from '@hameau/shared';
 import { riverPath } from './terrainMath';
 
 const GROUND_Y = 0.07;
@@ -49,6 +49,13 @@ export function agentPose(world: WorldState, agentId: string, tick: number): Pos
       const r = 2.3 + (i % 2) * 0.8;
       const c = world.terrain.plaza.center;
       return { x: c.x + Math.cos(angle) * r, y: GROUND_Y, z: c.z + Math.sin(angle) * r, heading: Math.atan2(-Math.cos(angle), -Math.sin(angle)), walking: false, hidden: false };
+    }
+    if (l.place === 'foret' || l.place === 'riviere') {
+      // Dispersés autour du coin de nature.
+      const i = rankAt(world, a, (x) => x.location?.kind === 'at' && x.location.place === l.place);
+      const s = NATURE_SPOTS[l.place];
+      const angle = i * 1.9 + 0.5;
+      return { x: s.x + Math.cos(angle) * 1.6, y: GROUND_Y, z: s.z + Math.sin(angle) * 1.6, heading: angle + Math.PI, walking: false, hidden: false };
     }
     const h = world.houses[l.place];
     if (h) {

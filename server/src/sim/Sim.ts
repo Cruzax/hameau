@@ -18,6 +18,7 @@ import { nextHop, roadBetween } from './graph';
 import { Politics } from './politics';
 import { Life } from './life';
 import { Daily } from './daily';
+import { pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { neighbors } from './graph';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
@@ -44,6 +45,12 @@ export interface Brain {
   /** Un vote de destitution s'ouvre : chaque agent doit envoyer un bulletin (action 'ballot'). */
   onVoteOpened?(sim: Sim, vote: VoteSession): void;
 }
+
+/** Ce qui mérite d'être proposé comme sujet de gazette. */
+const NEWSWORTHY = new Set<SimEvent['type']>([
+  'village.event', 'crime.theft', 'trial.verdict', 'couple.formed', 'agent.born', 'world.effect', 'party',
+  'health.sick', 'repair.done', 'mayor.elected', 'agent.left', 'agent.added', 'house.built',
+]);
 
 /** Variation d'opinion à partir de laquelle on l'inscrit au journal. */
 const NOTABLE_OPINION = 0.15;
@@ -174,6 +181,7 @@ export class Sim {
 
   emit(type: SimEvent['type'], actors: AgentId[], text: string, payload: Record<string, unknown> = {}) {
     const e = this.journal.append({ tick: this.clock.tick, day: this.clock.day, type, actors, text, payload });
+    if (NEWSWORTHY.has(type) && payload.phase !== 'end' && !payload.kept) pushNews(text);
     this.outbox.push(e);
     return e;
   }

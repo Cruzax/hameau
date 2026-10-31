@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { dist, distToPolyline, mulberry32, roadPath, type House, type Road, type Terrain, type Vec2 } from '@hameau/shared';
+import { dist, distToPolyline, mulberry32, NATURE_SPOTS, roadPath, type House, type Road, type Terrain, type Vec2 } from '@hameau/shared';
 import { riverPath, terrainHeight } from './terrainMath';
 
 type Kind = 'pin' | 'rond' | 'buisson' | 'rocher';
@@ -23,6 +23,7 @@ function scatter(terrain: Terrain, houses: House[], roads: Road[], housesById: R
     if (dist(p, terrain.plaza.center) < terrain.plaza.radius + 2.5) continue;
     if (distToPolyline(p, river) < terrain.river.width / 2 + 1.6) continue;
     if (houses.some((h) => dist(p, h.position) < 4.2)) continue;
+    if (Object.values(NATURE_SPOTS).some((spot) => dist(p, spot) < 3.2)) continue;
     if (paths.some((path) => distToPolyline(p, path) < 1.9)) continue;
     const kind: Kind = r < 0.45 ? 'pin' : r < 0.78 ? 'rond' : r < 0.92 ? 'buisson' : 'rocher';
     const palette = kind === 'rond' && autumn < 0.45 ? AUTUMN : GREENS;

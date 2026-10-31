@@ -1,34 +1,14 @@
 import { mulberry32, type Agent, type AgentId, type Role, type VoteSession, type WorldState } from '@hameau/shared';
 import type { Decision, VoteDecision } from './decision';
 import type { Trigger } from './prompts';
+import { DRAFTS, REVIEWS, TOPICS } from '../content/gazette';
+import { takeNews } from '../content/news';
 import { neighbors } from '../sim/graph';
 
 // Réponses scriptées du mode mock : zéro appel LLM, comportement crédible pour tester la simulation.
 
-const TOPICS = [
-  'Le puits de la place fait un bruit étrange la nuit',
-  'Une chèvre a été vue sur le toit de la mairie',
-  'Le pont grince plus que d’habitude',
-  'Des champignons géants poussent près de la rivière',
-  'Quelqu’un a repeint le panneau d’affichage en rose',
-  'Le four à pain est en panne depuis l’aube',
-  'Une lettre anonyme critique le maire',
-  'Les arbres ont roussi en une seule nuit',
-];
 const TASKS = ['Trouve-nous un sujet pour la gazette du jour !', 'Il me faut un sujet avant midi. Au travail !', 'La gazette n’attend pas : un sujet, vite.'];
 const SCOUTING = ['Je file voir du côté de la rivière…', 'J’ai entendu des rumeurs près du puits !', 'Il se passe toujours quelque chose au pont.'];
-const DRAFTS = [
-  (t: string) => `${t}. Les habitants s’interrogent, et la rumeur enfle comme une marée d’automne.`,
-  (t: string) => `${t}. Personne n’a rien vu, mais tout le monde a un avis.`,
-  (t: string) => `${t}. Un mystère de plus pour notre paisible hameau.`,
-];
-const REVIEWS: [number, string][] = [
-  [4, 'Enfin un sujet qui nous concerne. 4/5.'],
-  [2, 'Trop lyrique, on n’y comprend rien. 2/5.'],
-  [3, 'Correct, mais où sont les faits ? 3/5.'],
-  [5, 'Je l’ai lu deux fois. 5/5 !'],
-  [1, 'Du vent. 1/5.'],
-];
 const CAMPAIGN = ['Il est temps de changer de maire !', 'Ce maire ne nous écoute pas. Vote avec moi.', 'Une autre gazette est possible !'];
 export const CHATTER: Partial<Record<Role, string[]>> = {
   MAIRE: ['Tout se passe comme prévu ?', 'N’oubliez pas qui tient ce village.'],
@@ -79,7 +59,8 @@ export function createScript(seed = Date.now()) {
       const reader = byRole(w, 'LECTEUR');
 
       if (agent.role === 'ECLAIREUR' && msg.kind === 'task' && writer) {
-        day.topic = injected.shift() ?? pick(TOPICS.filter((t) => t !== lastTopic));
+        // Priorité : un événement injecté, puis une vraie nouvelle du village, sinon un sujet de secours.
+        day.topic = injected.shift() ?? (rand() < 0.75 ? takeNews() : undefined) ?? pick(TOPICS.filter((t) => t !== lastTopic));
         lastTopic = day.topic;
         return decision({ thought: pick(SCOUTING), messages: [{ to: writer, kind: 'topic', body: `Sujet : ${day.topic} !` }] });
       }
