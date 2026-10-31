@@ -67,6 +67,32 @@ function villageTime(w: WorldState) {
 
 const signed = (x: number) => (x >= 0 ? '+' : '') + x.toFixed(2);
 
+const level = (x: number, words: [string, string, string]) => (x < 0.3 ? words[0] : x < 0.65 ? words[1] : words[2]);
+
+function stateLine(w: WorldState, agent: Agent): string {
+  const n = agent.needs;
+  const inv = agent.inventory;
+  if (!n || !inv) return '';
+  const where =
+    agent.location?.kind === 'at'
+      ? agent.location.place === 'place'
+        ? 'sur la place'
+        : `chez ${w.agents[w.houses[agent.location.place]?.ownerId ?? '']?.name ?? 'quelqu’un'}`
+      : agent.location?.kind === 'walking'
+        ? 'en chemin'
+        : 'chez toi';
+  return (
+    `Ton état : ${level(n.satiete, ['affamé·e', 'un peu faim', 'rassasié·e'])}, ${level(n.energie, ['épuisé·e', 'fatigué·e', 'en forme'])}, ` +
+    `moral ${level(n.humeur, ['au plus bas', 'moyen', 'bon'])}${n.sante < 0.5 ? ', malade' : ''}. ` +
+    `Tu as ${inv.pain} pain(s), ${inv.bois} bûche(s), ${inv.outils} outil(s), ${inv.pieces} pièce(s). Tu es ${where}.`
+  );
+}
+
+function rumorLine(w: WorldState, agent: Agent): string {
+  const heard = (w.rumors ?? []).filter((r) => r.knownBy.includes(agent.id)).slice(-3);
+  return heard.length ? `Ce que tu as entendu dire : ${heard.map((r) => `« ${r.text} »`).join(' ; ')}.` : '';
+}
+
 function familyLine(w: WorldState, agent: Agent): string {
   const f = agent.family;
   if (!f) return '';
@@ -99,6 +125,8 @@ function context(w: WorldState, agent: Agent, skipText?: string): string[] {
     today ? `Gazette du jour : déjà publiée (« ${today.headline} »).` : 'Gazette du jour : pas encore publiée.',
     `Ce que tu penses des autres (de -1 à +1) : ${opinions.join(', ')}.`,
     familyLine(w, agent),
+    stateLine(w, agent),
+    rumorLine(w, agent),
     agent.memory.long ? `Ta mémoire des jours passés : ${agent.memory.long}` : '',
     memory.length ? `Tes derniers échanges :\n${memory.join('\n')}` : '',
   ];

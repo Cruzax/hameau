@@ -95,6 +95,7 @@ export class Life {
     this.coupledSince.set(pairKey(a.id, b.id), sim.clock.day);
     this.affinity.delete(pairKey(a.id, b.id));
     sim.emit('couple.formed', [a.id, b.id], `💞 ${a.name} et ${b.name} forment un couple !`);
+    sim.daily.scheduleParty(sim, `on célèbre le couple de ${a.name} et ${b.name}`);
     this.remember(a, `J${sim.clock.day} : je suis en couple avec ${b.name}.`);
     this.remember(b, `J${sim.clock.day} : je suis en couple avec ${a.name}.`);
     if (!neighbors(sim.world, a.id).includes(b.id)) {
@@ -164,6 +165,7 @@ export class Life {
     this.family(a).childIds.push(id);
     this.family(b).childIds.push(id);
     sim.emit('agent.born', [id, a.id, b.id], `👶 ${name} est né·e chez ${a.name} et ${b.name} !`, { agentId: id, agent: child });
+    sim.daily.scheduleParty(sim, `on fête la naissance de ${name}`);
     sim.touchAgents();
   }
 

@@ -54,6 +54,8 @@ export function startEffect(sim: Sim, kind: EffectKind) {
     effect.cutRoads = cut.map((r) => r.id);
     sim.broadcastPatch({ roads: w.roads });
   }
+  // L'orage rend malade : un habitant sur cinq environ.
+  if (kind === 'storm') for (const a of Object.values(w.agents)) if (Math.random() < 0.2) sim.daily.fallSick(sim, a);
   w.effects.push(effect);
   sim.emit('world.effect', [], ANNOUNCE[kind][0], { effect, phase: 'start' });
   sim.broadcastPatch({ effects: w.effects });

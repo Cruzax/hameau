@@ -17,6 +17,7 @@ import { Journal } from '../store/journal';
 import { nextHop, roadBetween } from './graph';
 import { Politics } from './politics';
 import { Life } from './life';
+import { Daily } from './daily';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { neighbors } from './graph';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
@@ -58,6 +59,8 @@ export class Sim {
   private timer: NodeJS.Timeout | null = null;
   readonly politics = new Politics();
   readonly life = new Life();
+  /** Vie quotidienne : besoins, métiers, déplacements, rumeurs, justice. */
+  readonly daily = new Daily();
   /** Vie du village (couples, naissances, constructions…). Désactivable avec LIFE_ENABLED=false. */
   lifeEnabled = process.env.LIFE_ENABLED !== 'false';
   private nextMsgId = 1;
@@ -112,6 +115,7 @@ export class Sim {
     this.advanceMessages();
     this.runPending();
     this.politics.onTick(this);
+    this.daily.onTick(this);
     tickEffects(this);
     this.brain.onTick?.(this);
     this.flush();
@@ -208,6 +212,7 @@ export class Sim {
         const g: Gazette = { ...a.gazette, day: this.clock.day, publishedTick: this.clock.tick, approvedBy: agentId };
         this.world.gazettes.push(g);
         this.emit('gazette.published', [agentId], `📰 La Gazette du jour ${g.day} paraît : « ${g.headline} »`, { gazette: g });
+        this.daily.payGazette(this);
         this.broadcast({ type: 'patch', world: { gazettes: this.world.gazettes } });
         break;
       }
@@ -347,7 +352,7 @@ export class Sim {
     return msg;
   }
 
-  private remember(id: AgentId, other: AgentId, direction: 'in' | 'out', text: string) {
+  remember(id: AgentId, other: AgentId, direction: 'in' | 'out', text: string) {
     const m = this.agent(id).memory.short;
     m.push({ tick: this.clock.tick, day: this.clock.day, with: other, direction, text });
     if (m.length > SHORT_MEMORY) m.shift();
