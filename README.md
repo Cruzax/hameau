@@ -14,19 +14,20 @@ Architecture, schéma de données et boucle de tick : [docs/ARCHITECTURE.md](doc
 
 ## Choisir le cerveau des agents
 
-Clique sur le badge 🧠 en haut à gauche : **Gratuit** (réponses scriptées), **Claude** (choix Opus, Sonnet
-ou Haiku) ou **Ollama** (modèle local). Le changement se fait en direct, sans redémarrer. Pour Claude,
-copie `.env.example` en `.env` et remplis `ANTHROPIC_API_KEY` (le menu relit le fichier). Réglages :
+Clique sur le badge 🧠 en haut à gauche :
 
-| `LLM_PROVIDER` | Coût | Remarque |
-|---|---|---|
-| `mock` (défaut) | 0 € | Réponses scriptées. Les tokens affichés sont une estimation. |
-| `anthropic` | quelques centimes par jour simulé | Renseigne `ANTHROPIC_API_KEY`. Modèle : `ANTHROPIC_MODEL` (défaut `claude-opus-5-5`). |
-| `ollama` | 0 € | Modèle local (`OLLAMA_MODEL`), plus lent et moins fiable sur le JSON. |
+- **Gratuit** : réponses scriptées, 0 €.
+- **🔑 Ajouter une clé API** : colle n'importe quelle clé (Claude, DeepSeek, OpenAI, OpenRouter, Groq, Grok,
+  Gemini, Mistral). Le fournisseur est reconnu d'après la forme de la clé, confirmé par un appel gratuit
+  (liste des modèles) uniquement auprès des fournisseurs plausibles, puis la clé est écrite dans `.env`.
+- **Ollama** : modèle local gratuit (`ollama pull deepseek-r1:8b`, `llama3.1`…), modèle au choix.
+
+Le changement se fait en direct. Pour Claude, le menu affiche une estimation du coût par jour simulé
+(≈ 0,15 € avec Opus 5.5, ≈ 0,07 € avec Sonnet 5.5, moins d'un centime avec Haiku 5.5 ; un jour simulé dure
+90 s à ×1) et le badge affiche la dépense de la session.
 
 Garde-fous : `LLM_MAX_CALLS_PER_DAY` (au-delà, le village se tait jusqu'au lendemain) et
-`LLM_MAX_TOKENS` (plafond par réponse). Le compteur 🧠 en haut à gauche affiche les appels du jour
-et les tokens consommés ; le détail de chaque appel est dans le journal (case « tout »).
+`LLM_MAX_TOKENS` (plafond par réponse).
 
 ## Raccourcis
 

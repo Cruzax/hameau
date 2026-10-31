@@ -518,3 +518,7 @@ button.brain__opt { cursor: pointer; }
 .brain__key { display: flex; gap: 8px; align-items: center; margin-top: 3px; font-size: 12px; }
 .brain__opt em.is-ok { color: #3f7a3a; }
 .brain__opt code { font-size: 10.5px; background: #f3e9d6; padding: 0 3px; border-radius: 3px; }
+.brain__menu { max-height: calc(100vh - 90px); overflow-y: auto; }
+.brain__guess { font-size: 11px; font-weight: 600; color: #2f5d8a !important; }
+.brain__hint { font-weight: 400; font-size: 11px; color: var(--ink-soft); }
+.brain__opt .brain__link { align-self: flex-start; font-size: 11px; }

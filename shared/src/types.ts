@@ -227,7 +227,8 @@ export interface WorldEffect {
   cutRoads?: RoadId[];
 }
 
-export type LLMProviderName = 'mock' | 'anthropic' | 'ollama';
+import type { LLMProviderName } from './providers';
+export type { LLMProviderName };
 
 export interface WorldState {
   clock: SimClock;
@@ -247,9 +248,11 @@ export interface WorldState {
     /** Modèle utilisé (Claude ou Ollama). */
     model?: string;
     /** Fournisseurs utilisables tout de suite (clé API présente, Ollama joignable). */
-    available?: Record<LLMProviderName, boolean>;
-    /** Fin de la clé API enregistrée (ex. « …a1b2 »), pour l'afficher sans la révéler. */
-    keyHint?: string;
+    available?: Partial<Record<LLMProviderName, boolean>>;
+    /** Fin de chaque clé enregistrée (ex. « …a1b2 »), pour l'afficher sans la révéler. */
+    keyHints?: Partial<Record<LLMProviderName, string>>;
+    /** Modèles proposés par chaque fournisseur (récupérés à la vérification de la clé). */
+    models?: Partial<Record<LLMProviderName, string[]>>;
     budget: LLMBudget;
   };
 }

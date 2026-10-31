@@ -25,4 +25,4 @@ export type ClientToServer =
   /** Choix du cerveau des agents, en direct. */
   | { type: 'llm.config'; provider: LLMProviderName; model?: string }
   /** Enregistre (ou efface, avec null) la clé API Anthropic dans le .env local. Jamais renvoyée au client. */
-  | { type: 'llm.key'; key: string | null };
+  | { type: 'llm.key'; key: string | null; provider?: LLMProviderName };
