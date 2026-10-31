@@ -1,4 +1,4 @@
-import { ROLE_LABEL, type Agent, type Message, type Role, type VoteSession, type WorldState } from '@hameau/shared';
+import { formatHour, isNight, villageHour, ROLE_LABEL, type Agent, type Message, type Role, type VoteSession, type WorldState } from '@hameau/shared';
 import { neighbors } from '../sim/graph';
 
 const DUTIES: Record<Role, string> = {
@@ -10,6 +10,14 @@ const DUTIES: Record<Role, string> = {
   ECRIVAIN: 'Quand tu reçois un sujet, tu écris un court article (2-3 phrases) et tu l’envoies à l’éditeur.',
   EDITEUR: 'Quand tu reçois un brouillon, tu le corriges et le resserres, puis tu envoies la version finale au maire.',
   LECTEUR: 'Quand le maire te soumet un article, tu lui renvoies un avis franc avec une note sur 5.',
+  BOULANGER: 'Chaque matin tu cuis le pain (il te faut du bois) et tu le vends aux habitants, une pièce le pain.',
+  FORGERON: 'Tu fabriques des outils et tu répares les ponts et les routes abîmés par la crue ou l’orage.',
+  HERBORISTE: 'Tu soignes les malades contre quelques pièces, et tu sais garder (ou monnayer) les secrets qu’on te confie.',
+  CRIEUR: 'Tu vas sur la place annoncer les nouvelles à tout le village d’un coup : tu es le seul à pouvoir parler à tous.',
+  AUBERGISTE: 'Tu tiens l’auberge : le soir, les habitants viennent boire et bavarder. Tu entends toutes les rumeurs.',
+  GARDE: 'Tu enquêtes sur les vols et les mensonges, et tu peux accuser quelqu’un devant le village.',
+  BARDE: 'Chaque soir à l’auberge, tu chantes ce qui s’est passé au village, à ta façon.',
+  VOLEUR: 'En apparence un simple vagabond. En secret, tu voles du pain et des pièces la nuit. Ne te fais jamais démasquer.',
   CITOYEN: 'Tu n’as plus de rôle dans la gazette. Tu vis ta vie, tu discutes, tu as des opinions.',
   MENTEUR: 'Tu mens volontiers et déformes ce que tu relaies, pour semer le trouble sans te faire prendre.',
 };
@@ -53,8 +61,8 @@ export type Trigger =
   | { type: 'inject'; text: string };
 
 function villageTime(w: WorldState) {
-  const m = 6 * 60 + Math.floor(((w.clock.tick % w.clock.ticksPerDay) / w.clock.ticksPerDay) * 16 * 60);
-  return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+  const h = villageHour(w.clock.tick, w.clock.ticksPerDay);
+  return `${formatHour(h).replace(':', 'h')}${isNight(w.clock) ? ' (la nuit)' : ''}`;
 }
 
 const signed = (x: number) => (x >= 0 ? '+' : '') + x.toFixed(2);

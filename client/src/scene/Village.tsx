@@ -18,10 +18,13 @@ import { CameraDirector } from './CameraDirector';
 import { Storm } from './Storm';
 import { Flood } from './Flood';
 import { WellGlow } from './WellGlow';
-import { approach, effectLevel } from './effectLevel';
+import { approach, effectLevel, nightNow } from './effectLevel';
+import { WINDOW_MATERIAL } from './House';
 
 const SKY = new Color('#f4d9b3');
 const STORM_SKY = new Color('#6f7884');
+const NIGHT_SKY = new Color('#1b2140');
+const NIGHT_GROUND = new Color('#2a3150');
 
 /** Lumière chaude du village ; l'orage assombrit le ciel et le soleil. */
 function Lights() {
@@ -29,16 +32,24 @@ function Lights() {
   const sun = useRef<DirectionalLight>(null);
   const hemi = useRef<HemisphereLight>(null);
   const storm = useRef(0);
+  const moon = useRef<DirectionalLight>(null);
   const sky = useMemo(() => SKY.clone(), []);
 
   useFrame((_, dt) => {
     storm.current = approach(storm.current, effectLevel('storm'), dt, 1.5);
     const s = storm.current;
-    sky.copy(SKY).lerp(STORM_SKY, s);
+    const n = nightNow();
+    sky.copy(SKY).lerp(NIGHT_SKY, n).lerp(STORM_SKY, s * (1 - 0.6 * n));
     if (scene.background instanceof Color) scene.background.copy(sky);
     if (scene.fog instanceof Fog) scene.fog.color.copy(sky);
-    if (sun.current) sun.current.intensity = 2.4 * (1 - 0.8 * s);
-    if (hemi.current) hemi.current.intensity = 0.9 * (1 - 0.55 * s);
+    if (sun.current) sun.current.intensity = 2.4 * (1 - 0.8 * s) * (1 - 0.92 * n);
+    if (hemi.current) {
+      hemi.current.intensity = 0.9 * (1 - 0.55 * s) * (1 - 0.55 * n);
+      hemi.current.groundColor.set('#7a8f4e').lerp(NIGHT_GROUND, n);
+    }
+    if (moon.current) moon.current.intensity = 0.55 * n;
+    // Les fenêtres s'allument à la tombée de la nuit.
+    WINDOW_MATERIAL.emissiveIntensity = 0.35 + 1.4 * n;
   });
 
   return (
@@ -46,6 +57,7 @@ function Lights() {
       <color attach="background" args={[SKY]} />
       <fog attach="fog" args={[SKY, 80, 150]} />
       <hemisphereLight ref={hemi} args={['#fff1d6', '#7a8f4e', 0.9]} />
+      <directionalLight ref={moon} position={[-30, 40, -20]} intensity={0} color="#9fb4ff" />
       <directionalLight
         ref={sun}
         castShadow

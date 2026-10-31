@@ -1,4 +1,4 @@
-import type { EffectKind } from '@hameau/shared';
+import { nightLevel, villageHour, type EffectKind } from '@hameau/shared';
 import { useHameau } from '../net/store';
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -20,3 +20,16 @@ export function effectLevel(kind: EffectKind): number {
 /** Rapproche `current` de `target` en douceur, indépendamment du framerate. */
 export const approach = (current: number, target: number, dt: number, speed = 2) =>
   current + (target - current) * (1 - Math.exp(-dt * speed));
+
+/** Tick courant, extrapolé entre deux messages du serveur (pour des animations fluides). */
+export function currentTick(): number {
+  const { world, tickAt } = useHameau.getState();
+  const c = world.clock;
+  return c.tick + (c.paused ? 0 : Math.min(1, (performance.now() - tickAt) / (c.tickMs / c.speed)));
+}
+
+/** 0 en plein jour, 1 en pleine nuit. */
+export function nightNow(): number {
+  const c = useHameau.getState().world.clock;
+  return nightLevel(villageHour(currentTick(), c.ticksPerDay));
+}

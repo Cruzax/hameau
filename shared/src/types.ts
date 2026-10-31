@@ -12,7 +12,50 @@ export type VoteId = string;
 
 /** Métier d'un agent. Être maire est une *fonction* (WorldState.mayorId), pas un métier :
  *  un maire destitué devient CITOYEN, un nouvel élu cumule son métier et la fonction. */
-export type Role = 'MAIRE' | 'ECLAIREUR' | 'ECRIVAIN' | 'EDITEUR' | 'LECTEUR' | 'CITOYEN' | 'MENTEUR';
+export type Role =
+  | 'MAIRE' | 'ECLAIREUR' | 'ECRIVAIN' | 'EDITEUR' | 'LECTEUR'
+  | 'BOULANGER' | 'FORGERON' | 'HERBORISTE' | 'CRIEUR' | 'AUBERGISTE' | 'GARDE' | 'BARDE' | 'VOLEUR'
+  | 'CITOYEN' | 'MENTEUR';
+
+// ─── Vie quotidienne ─────────────────────────────────────────────────────────
+
+/** Besoins, de 0 (au plus mal) à 1 (au mieux). Ils poussent les habitants à agir. */
+export interface Needs {
+  satiete: number;   // 0 = affamé
+  energie: number;   // 0 = épuisé
+  humeur: number;    // 0 = au fond du trou
+  sante: number;     // 0 = très malade
+}
+
+export interface Inventory {
+  pain: number;
+  bois: number;
+  outils: number;
+  pieces: number;
+}
+
+/** Lieu où l'on peut se rendre : la place du village, ou une maison (par son id). */
+export type PlaceId = 'place' | string;
+
+export type TripPurpose =
+  | 'acheter' | 'vendre' | 'visite' | 'taverne' | 'fete' | 'travail' | 'soin'
+  | 'annonce' | 'vol' | 'enquete' | 'reparer' | 'retour' | 'promenade';
+
+export type AgentLocation =
+  | { kind: 'home' }
+  | { kind: 'walking'; to: PlaceId; purpose: TripPurpose; path: Vec2[]; startTick: number; speed: number; length: number }
+  | { kind: 'at'; place: PlaceId; purpose: TripPurpose; until: number };
+
+/** Une rumeur : vraie ou fausse, elle se déforme en passant de bouche en bouche. */
+export interface Rumor {
+  id: string;
+  text: string;
+  about?: AgentId;
+  true: boolean;
+  origin: AgentId;
+  knownBy: AgentId[];
+  day: number;
+}
 
 // ─── Agents ──────────────────────────────────────────────────────────────────
 
@@ -54,11 +97,15 @@ export interface Agent {
   bornDay?: number;
   activity: AgentActivity;
   lastActionTick: number;
+  needs?: Needs;
+  inventory?: Inventory;
+  location?: AgentLocation;
+  asleep?: boolean;
 }
 
 // ─── Village (graphe) ────────────────────────────────────────────────────────
 
-export type HouseStyle = 'mairie' | 'tour' | 'chaumiere' | 'atelier' | 'cabane';
+export type HouseStyle = 'mairie' | 'tour' | 'chaumiere' | 'atelier' | 'cabane' | 'boulangerie' | 'forge' | 'auberge' | 'echoppe';
 
 export interface House {
   id: HouseId;
@@ -179,7 +226,12 @@ export type SimEventType =
   | 'vote.opened' | 'vote.cast' | 'vote.closed' | 'mayor.elected'
   | 'god.inject' | 'sim.paused' | 'sim.resumed' | 'sim.speed'
   | 'llm.call' | 'llm.budget_exhausted' | 'llm.config'
-  | 'world.effect';
+  | 'world.effect'
+  // Vie quotidienne
+  | 'life.trip' | 'life.meet' | 'life.trade' | 'life.work' | 'life.need' | 'life.sleep'
+  | 'rumor.spread' | 'rumor.announce'
+  | 'crime.theft' | 'crime.investigate' | 'trial.opened' | 'trial.verdict'
+  | 'health.sick' | 'health.healed' | 'repair.done' | 'song' | 'party';
 
 /** Une ligne du journal. Append-only, horodatée, rejouable : c'est le « script » des vidéos. */
 export interface SimEvent {
@@ -243,6 +295,7 @@ export interface WorldState {
   /** Tous les N jours, une fenêtre de vote s'ouvre. */
   voteEveryDays: number;
   effects: WorldEffect[];
+  rumors: Rumor[];
   llm: {
     provider: LLMProviderName;
     /** Modèle utilisé (Claude ou Ollama). */

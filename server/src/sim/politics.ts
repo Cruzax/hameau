@@ -1,9 +1,9 @@
-import type { AgentId, Ballot, Message, VoteSession } from '@hameau/shared';
+import { dayFraction, type AgentId, type Ballot, type Message, type VoteSession } from '@hameau/shared';
 import type { Sim } from './Sim';
 
-/** Le conseil s'ouvre vers 11h40 et les bulletins doivent être arrivés vers 19h40. */
-const OPEN_AT = 0.35;
-const CLOSE_AT = 0.85;
+/** Le conseil s'ouvre à 13 h et les bulletins doivent être arrivés avant 20 h. */
+const OPEN_AT = dayFraction(13);
+const CLOSE_AT = dayFraction(20);
 /** En dessous de cette opinion du maire, un agent est prêt à proposer sa destitution. */
 const MOTION_THRESHOLD = -0.05;
 
@@ -58,7 +58,7 @@ export class Politics {
     };
     w.votes.push(vote);
     sim.emit('vote.opened', [proposer.id, mayor],
-      `🗳️ ${proposer.name} demande la destitution de ${sim.agent(mayor).name} ! Les bulletins doivent arriver chez le maire avant 19h40.`,
+      `🗳️ ${proposer.name} demande la destitution de ${sim.agent(mayor).name} ! Les bulletins doivent arriver chez le maire avant 20 h.`,
       { voteId: vote.id });
     sim.touchVotes();
     sim.brain.onVoteOpened?.(sim, vote);

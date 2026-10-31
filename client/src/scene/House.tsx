@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import type { Group } from 'three';
+import { MeshStandardMaterial, type Group } from 'three';
 import { ROLE_COLOR, ROLE_LABEL, type Agent, type House as HouseData, type HouseStyle } from '@hameau/shared';
 
 interface Dims { w: number; d: number; h: number; roof: number }
@@ -12,17 +12,32 @@ const DIMS: Record<HouseStyle, Dims> = {
   chaumiere: { w: 3.2, d: 2.8, h: 2.0, roof: 2.1 },
   atelier: { w: 3.6, d: 3.0, h: 2.2, roof: 1.6 },
   cabane: { w: 3.0, d: 2.6, h: 1.9, roof: 1.7 },
+  boulangerie: { w: 3.6, d: 3.0, h: 2.2, roof: 1.7 },
+  forge: { w: 3.8, d: 3.2, h: 2.0, roof: 1.4 },
+  auberge: { w: 5.0, d: 3.6, h: 3.0, roof: 2.0 },
+  echoppe: { w: 3.0, d: 2.6, h: 2.0, roof: 1.8 },
 };
 
 const WOOD = '#6b4a2f';
 const STONE = '#b3a58c';
 const WINDOW = '#ffe2a0';
 
+/** Matériau commun à toutes les fenêtres : Lights l'allume la nuit. */
+export const WINDOW_MATERIAL = new MeshStandardMaterial({ color: WINDOW, emissive: WINDOW, emissiveIntensity: 0.35, flatShading: true });
+
 function Box({ args, position, color, emissive }: { args: [number, number, number]; position: [number, number, number]; color: string; emissive?: boolean }) {
+  // Les fenêtres partagent un matériau commun (allumé la nuit) ; les autres éléments lumineux gardent le leur.
+  if (emissive && color === WINDOW) {
+    return (
+      <mesh position={position} material={WINDOW_MATERIAL} castShadow receiveShadow>
+        <boxGeometry args={args} />
+      </mesh>
+    );
+  }
   return (
     <mesh position={position} castShadow receiveShadow>
       <boxGeometry args={args} />
-      <meshStandardMaterial color={color} flatShading emissive={emissive ? color : '#000'} emissiveIntensity={emissive ? 0.35 : 0} />
+      <meshStandardMaterial color={color} flatShading emissive={emissive ? color : '#000'} emissiveIntensity={emissive ? 0.6 : 0} />
     </mesh>
   );
 }
@@ -61,6 +76,74 @@ function Extras({ style, dims, roofColor }: { style: HouseStyle; dims: Dims; roo
               <meshStandardMaterial color="#8a5f3c" flatShading />
             </mesh>
           ))}
+        </>
+      );
+    case 'boulangerie':
+      return (
+        <>
+          {/* Four à pain en dôme, contre le mur */}
+          <mesh position={[dims.w / 2 + 0.7, 0.2, -0.2]} castShadow>
+            <sphereGeometry args={[0.9, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#c9a27a" flatShading />
+          </mesh>
+          <Box args={[0.45, 0.4, 0.1]} position={[dims.w / 2 + 0.7, 0.4, 0.68]} color="#3a2414" />
+          <Box args={[0.4, 1.4, 0.4]} position={[-dims.w * 0.3, dims.h + dims.roof * 0.55, -0.3]} color="#8f7f6a" />
+          {/* Enseigne : une miche */}
+          <mesh position={[0, dims.h + 0.05, dims.d / 2 + 0.35]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.6, 0.5]}>
+            <sphereGeometry args={[0.35, 8, 6]} />
+            <meshStandardMaterial color="#d99a4a" flatShading />
+          </mesh>
+        </>
+      );
+    case 'forge':
+      return (
+        <>
+          {/* Appentis ouvert avec enclume et foyer rougeoyant */}
+          <Box args={[1.8, 0.12, 1.8]} position={[dims.w / 2 + 0.9, 1.9, 0]} color="#4a4a50" />
+          {[-0.75, 0.75].map((z) => (
+            <Box key={z} args={[0.12, 1.9, 0.12]} position={[dims.w / 2 + 1.7, 0.95, z]} color="#6b4a2f" />
+          ))}
+          <Box args={[0.6, 0.25, 0.3]} position={[dims.w / 2 + 0.9, 0.75, 0.3]} color="#2c2c30" />
+          <Box args={[0.25, 0.5, 0.25]} position={[dims.w / 2 + 0.9, 0.38, 0.3]} color="#5a4030" />
+          <Box args={[0.7, 0.5, 0.7]} position={[dims.w / 2 + 0.9, 0.25, -0.5]} color="#ff7a2a" emissive />
+          <Box args={[0.6, 1.8, 0.6]} position={[dims.w * 0.25, dims.h + dims.roof * 0.6, 0]} color="#5b5f66" />
+        </>
+      );
+    case 'auberge':
+      return (
+        <>
+          {/* Étage, enseigne, tonneaux et banc */}
+          {[-1, 1].map((s) => (
+            <Box key={s} args={[0.55, 0.5, 0.06]} position={[s * dims.w * 0.3, dims.h * 0.78, dims.d / 2 + 0.01]} color={WINDOW} emissive />
+          ))}
+          <Box args={[0.08, 0.08, 0.9]} position={[dims.w / 2 - 0.2, 2.1, dims.d / 2 + 0.45]} color={WOOD} />
+          <Box args={[0.7, 0.5, 0.06]} position={[dims.w / 2 - 0.2, 1.75, dims.d / 2 + 0.85]} color="#e0b04a" />
+          {[0, 0.75].map((x) => (
+            <mesh key={x} position={[-dims.w / 2 - 0.5 + x, 0.4, dims.d / 2 - 0.2]} castShadow>
+              <cylinderGeometry args={[0.32, 0.32, 0.8, 8]} />
+              <meshStandardMaterial color="#8a5f3c" flatShading />
+            </mesh>
+          ))}
+          <Box args={[1.6, 0.12, 0.4]} position={[0.8, 0.45, dims.d / 2 + 0.6]} color={WOOD} />
+        </>
+      );
+    case 'echoppe':
+      return (
+        <>
+          {/* Pots d'herbes et bouquets qui sèchent */}
+          {[-0.8, 0, 0.8].map((x, i) => (
+            <group key={x} position={[x, 0, dims.d / 2 + 0.6]}>
+              <mesh position={[0, 0.2, 0]} castShadow>
+                <cylinderGeometry args={[0.2, 0.15, 0.4, 6]} />
+                <meshStandardMaterial color="#b0603a" flatShading />
+              </mesh>
+              <mesh position={[0, 0.6, 0]} castShadow>
+                <coneGeometry args={[0.28, 0.6, 5]} />
+                <meshStandardMaterial color={['#5f8f3a', '#7aa548', '#8a6aa8'][i]} flatShading />
+              </mesh>
+            </group>
+          ))}
+          <Box args={[dims.w * 0.8, 0.06, 0.06]} position={[0, dims.h - 0.1, dims.d / 2 + 0.25]} color={WOOD} />
         </>
       );
     case 'chaumiere':
