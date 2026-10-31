@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ROLE_LABEL, type Role } from '@hameau/shared';
 import { useHameau } from '../net/store';
-import { useUI } from './uiStore';
+import { Panel } from './Panel';
 
 const PRESETS = [
   'Un orage violent s’abat sur le village',
@@ -23,8 +23,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /** Panneau « Dieu » : agir sur le monde. Chaque action est envoyée au serveur et journalisée. */
 export function GodPanel() {
-  const open = useUI((s) => s.godOpen);
-  const setUI = useUI((s) => s.set);
   const world = useHameau((s) => s.world);
   const send = useHameau((s) => s.send);
   const connected = useHameau((s) => s.connected);
@@ -39,8 +37,6 @@ export function GodPanel() {
   const [who, setWho] = useState('');
   const [about, setAbout] = useState('');
 
-  if (!open) return null;
-
   const agents = Object.values(world.agents);
   const houses = Object.values(world.houses);
   const houseLabel = (id: string) => {
@@ -50,11 +46,8 @@ export function GodPanel() {
   const voteOpen = world.votes.some((v) => v.status === 'open');
 
   return (
-    <aside className="god">
-      <header className="god__head">
-        <strong>⚡ Mode Dieu</strong>
-        <button onClick={() => setUI({ godOpen: false })}>✕</button>
-      </header>
+    <Panel id="dieu" icon="⚡" title="Mode Dieu" minW={260}>
+      <div className="god">
       {!connected && <p className="god__warn">Serveur hors ligne : lance « npm run dev ».</p>}
 
       <Section title="Éléments">
@@ -181,6 +174,7 @@ export function GodPanel() {
           <button disabled={!who || !about} onClick={() => send({ type: 'god.opinion', who, about, delta: 0.3 })}>💚 Confiance</button>
         </div>
       </Section>
-    </aside>
+      </div>
+    </Panel>
   );
 }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
 import { ROLE_COLOR, ROLE_LABEL } from '@hameau/shared';
 import { useHameau } from '../net/store';
+import { Panel } from './Panel';
+import { useUI } from './uiStore';
 
 /** -1 (rouge) → 0 (crème) → +1 (vert). */
 function opinionColor(x: number) {
@@ -9,32 +10,52 @@ function opinionColor(x: number) {
   return `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
 }
 
-export function Legend() {
+/** Qui vit au village : rôle, maire, couple, enfant. Un clic cadre la caméra sur sa maison. */
+export function Habitants() {
   const agents = useHameau((s) => s.world.agents);
-  const roads = useHameau((s) => s.world.roads);
   const mayorId = useHameau((s) => s.world.mayorId);
-  const [showOpinions, setShowOpinions] = useState(true);
-  const list = Object.values(agents);
+  const roads = useHameau((s) => s.world.roads);
+  const setUI = useUI((s) => s.set);
   const openRoads = Object.values(roads).filter((r) => r.status === 'open').length;
 
   return (
-    <div className="legend">
-      {list.map((a) => (
-        <div key={a.id} className="legend__row">
-          <span className="legend__dot" style={{ background: ROLE_COLOR[a.role] }} />
-          <span>
-            <strong>{a.name}</strong> — {ROLE_LABEL[a.role]}
-            {mayorId === a.id ? ' 👑' : ''}
-            {a.family?.partnerId && agents[a.family.partnerId] ? ` 💞 ${agents[a.family.partnerId].name}` : ''}
-            {a.family?.parentIds.length ? ' 👶' : ''}
-          </span>
-        </div>
-      ))}
+    <Panel id="habitants" icon="👥" title={`Habitants · ${Object.keys(agents).length}`} minW={200}>
+      <ul className="people">
+        {Object.values(agents).map((a) => (
+          <li key={a.id}>
+            <button
+              className="person"
+              title="Centrer la caméra sur sa maison"
+              onClick={() => setUI({ shot: 'maison', focusHouse: a.houseId })}
+            >
+              <span className="person__dot" style={{ background: ROLE_COLOR[a.role] }} />
+              <span className="person__name">{a.name}</span>
+              <span className="person__role">{ROLE_LABEL[a.role]}</span>
+              <span className="person__tags">
+                {mayorId === a.id && <span title="Maire">👑</span>}
+                {a.family?.partnerId && agents[a.family.partnerId] && <span title={`En couple avec ${agents[a.family.partnerId].name}`}>💞</span>}
+                {a.family?.parentIds.length ? <span title="Enfant du village">👶</span> : null}
+                {a.activity === 'thinking' && <span title="Réfléchit">💭</span>}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="panel__foot">
+        {openRoads} routes ouvertes · clic sur un habitant pour le suivre (touche 1 pour revenir en caméra libre)
+      </p>
+    </Panel>
+  );
+}
 
-      <button className="legend__toggle" onClick={() => setShowOpinions(!showOpinions)}>
-        {showOpinions ? '▾' : '▸'} Ce qu’ils pensent les uns des autres
-      </button>
-      {showOpinions && (
+/** Ce que chacun pense des autres, de -1 à +1. */
+export function Relations() {
+  const agents = useHameau((s) => s.world.agents);
+  const list = Object.values(agents);
+
+  return (
+    <Panel id="relations" icon="💞" title="Ce qu’ils pensent les uns des autres" minW={220}>
+      <div className="opinions__wrap">
         <table className="opinions">
           <thead>
             <tr>
@@ -65,8 +86,8 @@ export function Legend() {
             ))}
           </tbody>
         </table>
-      )}
-      <div className="legend__hint">{openRoads} routes ouvertes · glisser pour tourner, molette pour zoomer</div>
-    </div>
+      </div>
+      <p className="panel__foot">Ligne = ce que cette personne pense de chaque colonne.</p>
+    </Panel>
   );
 }

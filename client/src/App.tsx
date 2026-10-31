@@ -5,11 +5,13 @@ import { useHameau } from './net/store';
 import { stopReplay } from './net/replay';
 import { Village } from './scene/Village';
 import { TitleBanner } from './ui/TitleBanner';
-import { Legend } from './ui/Legend';
-import { Journal } from './ui/Journal';
 import { Controls } from './ui/Controls';
 import { VotePanel } from './ui/VotePanel';
 import { GodPanel } from './ui/GodPanel';
+import { Sidebar } from './ui/Sidebar';
+import { GazettePanel, Journal } from './ui/Journal';
+import { Habitants, Relations } from './ui/Legend';
+import { useLayout } from './ui/layoutStore';
 import { Captions } from './ui/Captions';
 import { CaptureBar } from './ui/CaptureBar';
 import { ReplayBar } from './ui/ReplayBar';
@@ -27,15 +29,21 @@ function useShortcuts() {
       const ui = useUI.getState();
       const key = e.key.toLowerCase();
       if (key === 'c') ui.set({ capture: !ui.capture, shot: ui.capture ? 'libre' : 'survol' });
-      else if (key === 'g') ui.set({ godOpen: !ui.godOpen });
+      else if (key === 'g') useLayout.getState().toggle('dieu');
       else if (SHOT_KEYS[key]) ui.set({ shot: SHOT_KEYS[key] });
       else if (key === 'escape') {
         if (ui.capture) ui.set({ capture: false, shot: 'libre' });
         else if (useHameau.getState().mode === 'replay') stopReplay();
       }
     };
+    // Les fenêtres restent à l'écran quand on redimensionne le navigateur.
+    const onResize = () => useLayout.getState().clampAll();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 }
 
@@ -74,13 +82,20 @@ export default function App() {
         {!capture && (
           <>
             <Controls />
-            <Legend />
             <VotePanel />
           </>
         )}
       </div>
-      {!capture && <Journal />}
-      {!capture && <GodPanel />}
+      {!capture && (
+        <>
+          <Sidebar />
+          <Journal />
+          <GazettePanel />
+          <Habitants />
+          <Relations />
+          <GodPanel />
+        </>
+      )}
       {capture && <CaptureBar />}
       <ReplayBar />
     </div>

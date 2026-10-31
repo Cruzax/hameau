@@ -3,6 +3,7 @@ import { ROLE_COLOR, type SimEvent } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { SERVER_HTTP } from '../net/socket';
 import { replayFile, startReplay } from '../net/replay';
+import { Panel } from './Panel';
 
 /** Rejoue depuis un événement : on récupère le journal complet du serveur. */
 async function replayFrom(seq: number) {
@@ -16,65 +17,83 @@ const QUIET: SimEvent['type'][] = ['message.delivered', 'llm.call'];
 export function Journal() {
   const events = useHameau((s) => s.events);
   const agents = useHameau((s) => s.world.agents);
-  const gazettes = useHameau((s) => s.world.gazettes);
   const connected = useHameau((s) => s.connected);
   const mode = useHameau((s) => s.mode);
-  const [open, setOpen] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
-  const shown = events.filter((e) => showAll || !QUIET.includes(e.type)).slice(-80).reverse();
-  const last = gazettes[gazettes.length - 1];
+  const shown = events.filter((e) => showAll || !QUIET.includes(e.type)).slice(-120).reverse();
 
   return (
-    <aside className={`journal ${open ? '' : 'journal--closed'}`}>
-      <header className="journal__head">
-        <button className="journal__toggle" onClick={() => setOpen(!open)}>
-          {open ? '›' : '‹'} Journal
-        </button>
-        {open && (
-          <>
-            <label className="journal__opt">
-              <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> tout
-            </label>
-            <a className={`journal__export ${connected ? '' : 'is-disabled'}`} href={`${SERVER_HTTP}/journal.json`}>
-              Exporter JSON
-            </a>
-            <label className="journal__import" title="Rejouer un journal exporté">
-              📂
-              <input type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && replayFile(e.target.files[0])} />
-            </label>
-          </>
-        )}
-      </header>
-      {open && (
+    <Panel
+      id="journal"
+      icon="📜"
+      title="Journal"
+      minW={260}
+      actions={
         <>
-          {last && (
-            <div className="journal__gazette">
-              <div className="journal__gazette-kicker">Gazette du jour {last.day}</div>
-              <div className="journal__gazette-title">{last.headline}</div>
-              {last.articles[0]?.body && <div className="journal__gazette-body">{last.articles[0].body}</div>}
-              {last.review && <div className="journal__gazette-review">« {last.review.text} »</div>}
-            </div>
-          )}
-          <ol className="journal__list">
-            {shown.map((e) => {
-              const who = agents[e.actors[0]];
-              return (
-                <li key={e.seq} className={`journal__item journal__item--${e.type.split('.')[0]}`} style={{ borderLeftColor: who ? ROLE_COLOR[who.role] : undefined }}>
-                  <span className="journal__time">J{e.day}·{e.tick}</span>
-                  {e.text}
-                  {connected && mode === 'live' && (
-                    <button className="journal__replay" title="Rejouer à partir d’ici" onClick={() => replayFrom(e.seq)}>
-                      ▶
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-            {!shown.length && <li className="journal__empty">{connected ? 'En attente des premiers événements…' : 'Serveur hors ligne — lance « npm run dev ».'}</li>}
-          </ol>
+          <label className="chip" title="Afficher aussi les livraisons et les appels à l’IA">
+            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> tout
+          </label>
+          <a className={`chip chip--dark ${connected ? '' : 'is-disabled'}`} href={`${SERVER_HTTP}/journal.json`} title="Télécharger le journal (script des vidéos)">
+            ⬇ JSON
+          </a>
+          <label className="chip" title="Rejouer un journal exporté">
+            📂
+            <input type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && replayFile(e.target.files[0])} />
+          </label>
         </>
-      )}
-    </aside>
+      }
+    >
+      <ol className="journal__list">
+        {shown.map((e) => {
+          const who = agents[e.actors[0]];
+          return (
+            <li
+              key={e.seq}
+              className={`journal__item journal__item--${e.type.split('.')[0]}`}
+              style={{ borderLeftColor: who ? ROLE_COLOR[who.role] : undefined }}
+            >
+              <span className="journal__time">
+                J{e.day}·{e.tick}
+              </span>
+              {e.text}
+              {connected && mode === 'live' && (
+                <button className="journal__replay" title="Rejouer à partir d’ici" onClick={() => replayFrom(e.seq)}>
+                  ▶
+                </button>
+              )}
+            </li>
+          );
+        })}
+        {!shown.length && (
+          <li className="journal__empty">{connected ? 'En attente des premiers événements…' : 'Serveur hors ligne — lance « npm run dev ».'}</li>
+        )}
+      </ol>
+    </Panel>
+  );
+}
+
+/** Les gazettes parues, la plus récente en haut. */
+export function GazettePanel() {
+  const gazettes = useHameau((s) => s.world.gazettes);
+  const agents = useHameau((s) => s.world.agents);
+  const name = (id?: string) => (id ? agents[id]?.name ?? '?' : undefined);
+
+  return (
+    <Panel id="gazette" icon="📰" title="La Gazette" minW={240}>
+      {!gazettes.length && <p className="panel__empty">Pas encore de gazette. Le maire attend un sujet…</p>}
+      {[...gazettes].reverse().map((g) => (
+        <article key={g.day} className="gazette">
+          <div className="gazette__kicker">Jour {g.day}{g.approvedBy ? ` · validée par ${name(g.approvedBy)}` : ''}</div>
+          <h4 className="gazette__title">{g.headline}</h4>
+          {g.articles[0]?.body && <p className="gazette__body">{g.articles[0].body}</p>}
+          {g.review && (
+            <p className="gazette__review">
+              « {g.review.text} » — {name(g.review.by)}
+            </p>
+          )}
+        </article>
+      ))}
+    </Panel>
   );
 }

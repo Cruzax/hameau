@@ -1,5 +1,4 @@
 import { useHameau } from '../net/store';
-import { useUI } from './uiStore';
 import { BrainMenu } from './BrainMenu';
 
 const SPEEDS = [1, 2, 4, 8];
@@ -14,7 +13,6 @@ export function Controls() {
   const clock = useHameau((s) => s.world.clock);
   const connected = useHameau((s) => s.connected);
   const send = useHameau((s) => s.send);
-  const ui = useUI();
 
   return (
     <div className="controls">
@@ -29,12 +27,6 @@ export function Controls() {
         </button>
       ))}
       <BrainMenu />
-      <button className={ui.godOpen ? 'is-active' : ''} onClick={() => ui.set({ godOpen: !ui.godOpen })} title="Touche G">
-        ⚡ Dieu
-      </button>
-      <button onClick={() => ui.set({ capture: true, shot: 'survol' })} title="Touche C">
-        🎬 Capture
-      </button>
     </div>
   );
 }

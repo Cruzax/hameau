@@ -3,7 +3,6 @@ import { create } from 'zustand';
 export type CameraShot = 'libre' | 'survol' | 'maison' | 'messager';
 
 interface UIState {
-  godOpen: boolean;
   /** Mode capture : cadre 9:16, interface masquée, caméra pilotée. */
   capture: boolean;
   subtitles: boolean;
@@ -14,7 +13,6 @@ interface UIState {
 }
 
 export const useUI = create<UIState>((set) => ({
-  godOpen: false,
   capture: false,
   subtitles: true,
   shot: 'libre',
