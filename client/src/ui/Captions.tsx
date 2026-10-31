@@ -7,7 +7,7 @@ const CAPTIONED: SimEvent['type'][] = [
   'message.sent', 'message.lost', 'message.relayed', 'agent.thought', 'agent.opinion', 'gazette.published',
   'vote.opened', 'vote.closed', 'mayor.elected', 'road.cut', 'road.added', 'road.built',
   'god.inject', 'agent.added', 'agent.left', 'day.start',
-  'couple.formed', 'couple.split', 'agent.born', 'house.built',
+  'couple.formed', 'couple.split', 'agent.born', 'house.built', 'world.effect',
 ];
 const HOLD_MS = 4200;
 

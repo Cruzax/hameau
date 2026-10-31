@@ -178,7 +178,8 @@ export type SimEventType =
   | 'gazette.published'
   | 'vote.opened' | 'vote.cast' | 'vote.closed' | 'mayor.elected'
   | 'god.inject' | 'sim.paused' | 'sim.resumed' | 'sim.speed'
-  | 'llm.call' | 'llm.budget_exhausted';
+  | 'llm.call' | 'llm.budget_exhausted' | 'llm.config'
+  | 'world.effect';
 
 /** Une ligne du journal. Append-only, horodatée, rejouable : c'est le « script » des vidéos. */
 export interface SimEvent {
@@ -211,6 +212,23 @@ export interface SimClock {
   paused: boolean;
 }
 
+// ─── Éléments (météo et phénomènes) ──────────────────────────────────────────
+
+/** orage : pluie, éclairs, messagers ralentis · crue : la rivière déborde et coupe les ponts ·
+ *  puits : le puits de la place s'illumine (trésor, mystère). */
+export type EffectKind = 'storm' | 'flood' | 'well';
+
+export interface WorldEffect {
+  id: string;
+  kind: EffectKind;
+  startTick: number;
+  endTick: number;
+  /** Routes coupées par l'effet (crue), rouvertes à la fin. */
+  cutRoads?: RoadId[];
+}
+
+export type LLMProviderName = 'mock' | 'anthropic' | 'ollama';
+
 export interface WorldState {
   clock: SimClock;
   terrain: Terrain;
@@ -223,5 +241,13 @@ export interface WorldState {
   votes: VoteSession[];
   /** Tous les N jours, une fenêtre de vote s'ouvre. */
   voteEveryDays: number;
-  llm: { provider: 'mock' | 'anthropic' | 'ollama'; budget: LLMBudget };
+  effects: WorldEffect[];
+  llm: {
+    provider: LLMProviderName;
+    /** Modèle utilisé (Claude ou Ollama). */
+    model?: string;
+    /** Fournisseurs utilisables tout de suite (clé API présente, Ollama joignable). */
+    available?: Record<LLMProviderName, boolean>;
+    budget: LLMBudget;
+  };
 }

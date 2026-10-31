@@ -16,7 +16,9 @@ const CHAT_REPLY_CHANCE = 0.4;
  * (début de journée, message reçu, événement), le modèle décide, et les actions validées
  * sont rejouées dans la simulation. En mock, le provider renvoie la réponse scriptée.
  */
-export function createLLMBrain(provider: LLMProvider, seed?: number): Brain {
+export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { setProvider(p: LLMProvider): void } {
+  // Le fournisseur peut changer en cours de partie (menu « cerveau des agents »).
+  let provider = initial;
   const script = createScript(seed);
   const busy = new Set<AgentId>();
   const queued = new Map<AgentId, Trigger[]>();
@@ -75,6 +77,10 @@ export function createLLMBrain(provider: LLMProvider, seed?: number): Brain {
   }
 
   return {
+    setProvider(p) {
+      provider = p;
+    },
+
     onDayStart(sim) {
       script.newDay();
       void wake(sim, sim.world.mayorId, { type: 'day' });

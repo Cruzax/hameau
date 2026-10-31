@@ -14,7 +14,9 @@ Architecture, schéma de données et boucle de tick : [docs/ARCHITECTURE.md](doc
 
 ## Choisir le cerveau des agents
 
-Copie `.env.example` en `.env`, puis :
+Clique sur le badge 🧠 en haut à gauche : **Gratuit** (réponses scriptées), **Claude** (choix Opus, Sonnet
+ou Haiku) ou **Ollama** (modèle local). Le changement se fait en direct, sans redémarrer. Pour Claude,
+copie `.env.example` en `.env` et remplis `ANTHROPIC_API_KEY` (le menu relit le fichier). Réglages :
 
 | `LLM_PROVIDER` | Coût | Remarque |
 |---|---|---|
@@ -37,6 +39,12 @@ et les tokens consommés ; le détail de chaque appel est dans le journal (case 
 
 Clic sur une route du village : la couper ou la rouvrir. Dans le journal, survole un événement puis ▶ pour
 le rejouer ; 📂 rejoue un journal exporté.
+
+## Éléments
+
+Dans le mode Dieu : ⛈ **orage** (pluie, ciel sombre, éclairs, messagers ralentis), 🌊 **crue** (la rivière
+déborde et submerge les ponts, coupés jusqu’à la décrue), ✨ **puits** (colonne de lumière dorée). Un événement
+tapé à la main qui parle d’orage, de crue ou de trésor déclenche aussi l’animation.
 
 ## Le village vit tout seul
 

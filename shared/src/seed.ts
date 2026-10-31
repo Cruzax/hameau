@@ -113,6 +113,7 @@ export function createSeedWorld(): WorldState {
     messages: {},
     gazettes: [],
     votes: [],
+    effects: [],
     voteEveryDays: 3,
     llm: { provider: 'mock', budget: { maxCallsPerDay: 40, callsToday: 0, maxTokens: 300, tokensIn: 0, tokensOut: 0 } },
   };

@@ -17,6 +17,7 @@ import { Journal } from '../store/journal';
 import { nextHop, roadBetween } from './graph';
 import { Politics } from './politics';
 import { Life } from './life';
+import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { neighbors } from './graph';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
 
@@ -111,6 +112,7 @@ export class Sim {
     this.advanceMessages();
     this.runPending();
     this.politics.onTick(this);
+    tickEffects(this);
     this.brain.onTick?.(this);
     this.flush();
   }
@@ -303,7 +305,8 @@ export class Sim {
           `✂️ La route est coupée : le messager de ${this.agent(msg.from).name} ${verb}.`, { messageId: msg.id });
         continue;
       }
-      msg.progress = Math.min(1, msg.progress + msg.speed / roadLength(road, this.world.houses));
+      const speed = isActive(this, 'storm') ? msg.speed * STORM_SLOWDOWN : msg.speed;
+      msg.progress = Math.min(1, msg.progress + speed / roadLength(road, this.world.houses));
       if (msg.progress >= 1) this.deliver(msg);
     }
   }
@@ -374,7 +377,18 @@ export class Sim {
         break;
       case 'god.inject':
         this.emit('god.inject', c.targets ?? [], `⚡ Événement : ${c.text}`, { text: c.text });
+        for (const kind of effectsFromText(c.text)) startEffect(this, kind);
         this.brain.onInject?.(this, c.text);
+        break;
+      case 'god.effect': {
+        const text = { storm: 'Un violent orage s’abat sur le village', flood: 'La rivière déborde', well: 'Le puits de la place s’illumine mystérieusement' }[c.kind];
+        startEffect(this, c.kind);
+        this.brain.onInject?.(this, text);
+        break;
+      }
+      case 'llm.config':
+        // Géré par index.ts (qui possède le fournisseur) ; voir onLLMConfig.
+        this.onLLMConfig?.(c);
         break;
       case 'god.agent.add':
         addAgent(this, c);
@@ -391,6 +405,9 @@ export class Sim {
     }
     this.flush();
   }
+
+  /** Branché par index.ts pour changer de fournisseur LLM en direct. */
+  onLLMConfig?: (c: Extract<ClientToServer, { type: 'llm.config' }>) => void;
 
   broadcastPatch(world: Partial<WorldState>) {
     this.broadcast({ type: 'patch', world });

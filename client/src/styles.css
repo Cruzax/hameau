@@ -468,3 +468,44 @@ html, body, #root, .app {
 .god__primary { background: var(--ink) !important; color: var(--paper) !important; font-weight: 600; }
 .god__hint { margin: 2px 0 6px; color: var(--ink-soft); font-size: 11px; }
 .god__warn { margin: 8px 12px; color: #c8553d; }
+
+/* ─── Menu « cerveau des agents » ───────────────────────────── */
+.brain { position: relative; }
+.controls button.controls__llm { cursor: pointer; }
+.brain__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 300px;
+  padding: 10px;
+  background: var(--paper);
+  border: 1px solid var(--paper-edge);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(80, 50, 20, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 40;
+}
+.brain__title { font-family: var(--font-title); font-weight: 800; font-size: 15px; }
+.brain__opt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1.5px solid var(--paper-edge);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+}
+button.brain__opt { cursor: pointer; }
+.brain__opt span { color: var(--ink-soft); font-size: 11px; }
+.brain__opt em { font-size: 11px; color: #a0442f; }
+.brain__opt.is-current { border-color: #5a9a4a; box-shadow: inset 0 0 0 1px #5a9a4a; }
+.brain__opt.is-off strong { opacity: 0.6; }
+.brain__row { display: flex; gap: 4px; margin-top: 3px; }
+.brain__row select { flex: 1; min-width: 0; font: inherit; border: 1px solid var(--paper-edge); border-radius: 7px; }
+.brain__link { border: 0 !important; background: none !important; padding: 0 !important; color: #2f5d8a !important; text-decoration: underline; cursor: pointer; min-width: 0 !important; font: inherit; }

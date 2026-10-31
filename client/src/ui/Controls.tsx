@@ -1,5 +1,6 @@
 import { useHameau } from '../net/store';
 import { useUI } from './uiStore';
+import { BrainMenu } from './BrainMenu';
 
 const SPEEDS = [1, 2, 4, 8];
 
@@ -9,11 +10,8 @@ function villageTime(tick: number, ticksPerDay: number) {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
-const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
-
 export function Controls() {
   const clock = useHameau((s) => s.world.clock);
-  const llm = useHameau((s) => s.world.llm);
   const connected = useHameau((s) => s.connected);
   const send = useHameau((s) => s.send);
   const ui = useUI();
@@ -30,12 +28,7 @@ export function Controls() {
           ×{s}
         </button>
       ))}
-      <span
-        className={`controls__llm ${llm.budget.callsToday >= llm.budget.maxCallsPerDay ? 'is-exhausted' : ''}`}
-        title={`Fournisseur : ${llm.provider}${llm.provider === 'mock' ? ' (tokens estimés, 0 €)' : ''} · max_tokens ${llm.budget.maxTokens}`}
-      >
-        🧠 {llm.provider} · {llm.budget.callsToday}/{llm.budget.maxCallsPerDay} · {kTokens(llm.budget.tokensIn)}↓ {kTokens(llm.budget.tokensOut)}↑
-      </span>
+      <BrainMenu />
       <button className={ui.godOpen ? 'is-active' : ''} onClick={() => ui.set({ godOpen: !ui.godOpen })} title="Touche G">
         ⚡ Dieu
       </button>

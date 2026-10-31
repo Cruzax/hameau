@@ -37,6 +37,7 @@ function worldBefore(current: WorldState, events: SimEvent[], startSeq: number):
   }
   const start = later[0];
   w.messages = {};
+  w.effects = [];
   w.gazettes = w.gazettes.filter((g) => !start || (g.publishedTick ?? 0) < start.tick);
   w.votes = w.votes.filter((v) => !start || v.openedTick < start.tick);
   if (start) w.clock = { ...w.clock, tick: start.tick, day: start.day, paused: false };
@@ -86,6 +87,11 @@ function apply(w: WorldState, e: SimEvent) {
       if (w.agents[who] && typeof p.after === 'number') {
         w.agents = { ...w.agents, [who]: { ...w.agents[who], opinions: { ...w.agents[who].opinions, [about]: p.after } } };
       }
+      break;
+    }
+    case 'world.effect': {
+      const fx = p.effect as WorldState['effects'][number] | undefined;
+      if (fx) w.effects = p.phase === 'start' ? [...(w.effects ?? []), fx] : (w.effects ?? []).filter((x) => x.id !== fx.id);
       break;
     }
     case 'agent.born':

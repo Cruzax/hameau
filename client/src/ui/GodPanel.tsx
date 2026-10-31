@@ -57,6 +57,23 @@ export function GodPanel() {
       </header>
       {!connected && <p className="god__warn">Serveur hors ligne : lance « npm run dev ».</p>}
 
+      <Section title="Éléments">
+        <div className="god__row">
+          {(
+            [
+              ['storm', '⛈ Orage'],
+              ['flood', '🌊 Crue'],
+              ['well', '✨ Puits'],
+            ] as const
+          ).map(([kind, label]) => (
+            <button key={kind} disabled={world.effects?.some((e) => e.kind === kind)} onClick={() => send({ type: 'god.effect', kind })}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="god__hint">La crue submerge les ponts, l’orage ralentit les messagers. Les agents réagissent.</p>
+      </Section>
+
       <Section title="Routes">
         <p className="god__hint">Astuce : clique directement sur une route dans le village pour la couper.</p>
         <ul className="god__list">

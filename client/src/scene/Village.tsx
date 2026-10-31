@@ -1,5 +1,7 @@
 import { OrbitControls } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Color, Fog, type DirectionalLight, type HemisphereLight } from 'three';
 import { ROLE_COLOR } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { Terrain } from './Terrain';
@@ -13,16 +15,39 @@ import { Messengers } from './Messengers';
 import { Bubbles } from './Bubbles';
 import { residentSpot } from './spots';
 import { CameraDirector } from './CameraDirector';
+import { Storm } from './Storm';
+import { Flood } from './Flood';
+import { WellGlow } from './WellGlow';
+import { approach, effectLevel } from './effectLevel';
 
-const SKY = '#f4d9b3';
+const SKY = new Color('#f4d9b3');
+const STORM_SKY = new Color('#6f7884');
 
+/** Lumière chaude du village ; l'orage assombrit le ciel et le soleil. */
 function Lights() {
+  const scene = useThree((s) => s.scene);
+  const sun = useRef<DirectionalLight>(null);
+  const hemi = useRef<HemisphereLight>(null);
+  const storm = useRef(0);
+  const sky = useMemo(() => SKY.clone(), []);
+
+  useFrame((_, dt) => {
+    storm.current = approach(storm.current, effectLevel('storm'), dt, 1.5);
+    const s = storm.current;
+    sky.copy(SKY).lerp(STORM_SKY, s);
+    if (scene.background instanceof Color) scene.background.copy(sky);
+    if (scene.fog instanceof Fog) scene.fog.color.copy(sky);
+    if (sun.current) sun.current.intensity = 2.4 * (1 - 0.8 * s);
+    if (hemi.current) hemi.current.intensity = 0.9 * (1 - 0.55 * s);
+  });
+
   return (
     <>
       <color attach="background" args={[SKY]} />
       <fog attach="fog" args={[SKY, 80, 150]} />
-      <hemisphereLight args={['#fff1d6', '#7a8f4e', 0.9]} />
+      <hemisphereLight ref={hemi} args={['#fff1d6', '#7a8f4e', 0.9]} />
       <directionalLight
+        ref={sun}
         castShadow
         position={[28, 40, 18]}
         intensity={2.4}
@@ -67,7 +92,9 @@ export function Village() {
 
       <Terrain terrain={terrain} />
       <River terrain={terrain} />
+      <Flood terrain={terrain} />
       <Plaza terrain={terrain} />
+      <WellGlow terrain={terrain} />
       <Roads roads={roads} houses={housesById} terrain={terrain} onToggle={(roadId) => send({ type: 'god.road.cut', roadId })} />
       <Trees terrain={terrain} houses={housesById} roads={roads} />
 
@@ -89,6 +116,7 @@ export function Village() {
         );
       })}
 
+      <Storm />
       <CameraDirector />
       <Messengers />
       <Bubbles />
