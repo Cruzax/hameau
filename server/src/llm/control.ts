@@ -100,7 +100,8 @@ export class LLMControl {
           : c.provider === 'anthropic'
             ? LLM_CONFIG.anthropicModel
             : c.provider === 'ollama'
-              ? LLM_CONFIG.ollamaModel
+              ? // Le modèle par défaut s'il est installé, sinon le premier modèle présent sur ce PC.
+                known.includes(LLM_CONFIG.ollamaModel) || !known.length ? LLM_CONFIG.ollamaModel : known[0]
               : defaultModel(c.provider, known);
     this.setProvider(createProvider(c.provider, model));
     this.llm.provider = c.provider;

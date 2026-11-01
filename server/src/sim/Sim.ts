@@ -512,6 +512,10 @@ export class Sim {
     this.emit('god.inject', [], preset === 'origine'
       ? '🔄 Nouvelle histoire : le hameau d’origine, ses cinq habitants et sa gazette.'
       : '🔄 Nouvelle histoire : le village au complet.', { reset: preset });
+    // Le journal repart de zéro : on y note quel cerveau anime les agents.
+    this.emit('llm.config', [], `🧠 Cerveau des agents : ${llm.provider === 'mock' ? 'gratuit (réponses scriptées)' : `${llm.provider} · ${llm.model ?? '?'}`}.`, {
+      provider: llm.provider, model: llm.model, ok: true,
+    });
     this.startDay();
     this.flush();
   }

@@ -27,6 +27,7 @@ export class OllamaProvider implements LLMProvider {
           ],
         }),
       });
+      if (res.status === 404) return { data: null, tokensIn: 0, tokensOut: 0, error: `modèle « ${this.model} » absent (ollama pull ${this.model})` };
       if (!res.ok) return { data: null, tokensIn: 0, tokensOut: 0, error: `Ollama ${res.status}` };
       const body = (await res.json()) as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
       const tokensIn = body.prompt_eval_count ?? 0;

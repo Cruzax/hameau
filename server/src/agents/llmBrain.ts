@@ -50,7 +50,8 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
     sim.emit('llm.call', [agent.id], `🧠 ${agent.name} · ${purpose} · ${res.tokensIn}→${res.tokensOut} tokens${res.error ? ` · ⚠️ ${res.error}` : ''}`, {
       provider: provider.name, purpose, tokensIn: res.tokensIn, tokensOut: res.tokensOut, error: res.error,
     });
-    return res.data;
+    // Appel raté (modèle absent, JSON invalide…) : l'agent agit comme en mode gratuit plutôt que de rester muet.
+    return res.data ?? req.scripted();
   }
 
   async function wake(sim: Sim, agentId: AgentId, trigger: Trigger) {
