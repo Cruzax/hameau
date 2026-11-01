@@ -19,7 +19,7 @@ export const CHATTER: Partial<Record<Role, string[]>> = {
   CITOYEN: ['Ah, c’était mieux quand j’étais maire.', 'Tu as des nouvelles de la mairie ?'],
 };
 
-const decision = (d: Partial<Decision>): Decision => ({ thought: '', messages: [], publish: null, opinions: [], ...d });
+const decision = (d: Partial<Decision>): Decision => ({ thought: '', messages: [], publish: null, opinions: [], go: null, ...d });
 
 export function createScript(seed = Date.now()) {
   const rand = mulberry32(seed);

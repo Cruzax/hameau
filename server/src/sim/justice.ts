@@ -117,8 +117,8 @@ export class Justice {
     const truth = accused.id === c.culprit;
     sim.emit('trial.verdict', [accused.id, garde ?? accused.id],
       condemned
-        ? `⚖️ Coupable (${guilty}/${voters}) ! ${accused.name} est banni·e du village.`
-        : `⚖️ Acquitté·e (${guilty}/${voters}). ${accused.name} rentre chez soi, la tête haute.`,
+        ? `⚖️ ${accused.name} est jugé·e coupable (${guilty}/${voters}) et banni·e du village !`
+        : `⚖️ ${accused.name} est acquitté·e (${guilty}/${voters}) et rentre chez soi, la tête haute.`,
       { caseId: c.id, condemned, truth });
     if (condemned) {
       if (!truth) for (const a of Object.values(sim.world.agents)) if (a.id === c.culprit) sim.remember(a.id, a.id, 'in', `Ils ont banni ${accused.name} à ma place…`);

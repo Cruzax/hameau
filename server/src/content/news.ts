@@ -11,6 +11,15 @@ export function pushNews(text: string) {
   if (fresh.length > MAX) fresh.shift();
 }
 
+/** Les dernières nouvelles, sans les retirer (pour les montrer à l'IA). */
+export function peekNews(n = 5): string[] {
+  return fresh.slice(-n).reverse();
+}
+
+export function clearNews() {
+  fresh.length = 0;
+}
+
 /** La nouvelle la plus récente pas encore traitée, ou undefined. */
 export function takeNews(): string | undefined {
   return fresh.pop();

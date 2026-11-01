@@ -20,6 +20,10 @@ export const DecisionSchema = z.object({
     .object({ headline: z.string(), body: z.string() })
     .nullable()
     .describe('Réservé au maire : publier la gazette du jour. null sinon.'),
+  go: z
+    .string()
+    .nullable()
+    .describe('Où te rendre à pied maintenant : "place", "foret", "riviere", ou l’id d’un habitant chez qui aller. null pour rester.'),
   opinions: z
     .array(
       z.object({
@@ -95,6 +99,12 @@ export function toActions(world: WorldState, agent: Agent, d: Decision): Action[
     const about = resolveAgent(world, o.about);
     if (!about || about === agent.id || !Number.isFinite(o.delta)) continue;
     actions.push({ type: 'opinion', about, delta: Math.max(-MAX_OPINION_DELTA, Math.min(MAX_OPINION_DELTA, o.delta)), reason: clip(o.reason, 120) });
+  }
+
+  if (d.go) {
+    const key = d.go.trim().toLowerCase();
+    const place = ['place', 'foret', 'riviere'].includes(key) ? key : resolveAgent(world, key);
+    if (place && place !== agent.id) actions.push({ type: 'go', place });
   }
 
   const alreadyPublished = world.gazettes.some((g) => g.day === world.clock.day);

@@ -137,7 +137,8 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
       for (const agent of Object.values(sim.world.agents)) {
         if (!agent.memory.short.some((m) => m.day === sim.clock.day)) continue;
         const fallback = script.summarize(sim.world, agent);
-        if (provider.name === 'mock' || !reserve(sim)) {
+        // Un jour sur deux seulement : le résumé par l'IA coûtait un quart des appels.
+        if (provider.name === 'mock' || sim.clock.day % 2 === 1 || !reserve(sim)) {
           agent.memory.long = fallback;
           continue;
         }

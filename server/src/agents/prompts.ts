@@ -1,5 +1,6 @@
 import { formatHour, isNight, villageHour, ROLE_LABEL, type Agent, type Message, type Role, type VoteSession, type WorldState } from '@hameau/shared';
 import { neighbors } from '../sim/graph';
+import { peekNews } from '../content/news';
 
 const DUTIES: Record<Role, string> = {
   MAIRE:
@@ -92,8 +93,27 @@ function stateLine(w: WorldState, agent: Agent): string {
 }
 
 function rumorLine(w: WorldState, agent: Agent): string {
-  const heard = (w.rumors ?? []).filter((r) => r.knownBy.includes(agent.id)).slice(-3);
+  // Seulement les rumeurs des deux derniers jours : sinon la même revient sans fin.
+  const heard = (w.rumors ?? []).filter((r) => r.knownBy.includes(agent.id) && w.clock.day - r.day <= 1).slice(-3);
   return heard.length ? `Ce que tu as entendu dire : ${heard.map((r) => `« ${r.text} »`).join(' ; ')}.` : '';
+}
+
+/** Pour l'éclaireur et le maire : ce qui s'est vraiment passé, et ce qui est déjà paru. */
+function newsroomLine(w: WorldState, agent: Agent): string {
+  if (agent.role !== 'ECLAIREUR' && agent.role !== 'ECRIVAIN' && agent.id !== w.mayorId) return '';
+  const facts = peekNews(5);
+  const past = w.gazettes.slice(-5).map((g) => `« ${g.headline} »`);
+  return [
+    facts.length ? `FAITS RÉCENTS AU VILLAGE (sujets de gazette tout trouvés) : ${facts.map((f) => `« ${f} »`).join(' ; ')}.` : '',
+    past.length ? `DÉJÀ PARUS (ne pas les reprendre, ni leurs thèmes) : ${past.join(' ; ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Les seuls endroits où l'on peut aller (aucun autre lieu n'existe). */
+function placesLine(): string {
+  return 'LIEUX RÉELS où tu peux aller (champ "go") : la place (place), la forêt (foret), la rivière (riviere), ou chez un habitant (son id). Aucun autre lieu n’existe.';
 }
 
 /** Le dossier de la gazette, visible de ceux qui la fabriquent. */
@@ -131,10 +151,13 @@ function context(w: WorldState, agent: Agent, skipText?: string): string[] {
   const far = Object.keys(w.agents).filter((id) => id !== agent.id && !near.includes(id));
   const who = (id: string) => `${name(id)} (id: ${id}, ${ROLE_LABEL[w.agents[id].role].toLowerCase()})`;
   const today = w.gazettes.find((g) => g.day === w.clock.day);
-  const opinions = Object.entries(agent.opinions).map(([id, x]) => `${name(id)} ${signed(x)}`);
+  // Seulement les opinions marquées, pour garder le contexte court.
+  const opinions = Object.entries(agent.opinions)
+    .filter(([id, x]) => w.agents[id] && Math.abs(x) >= 0.1)
+    .map(([id, x]) => `${name(id)} ${signed(x)}`);
 
   // Le message qui réveille l'agent est déjà en mémoire courte : on ne le répète pas.
-  const short = agent.memory.short.filter((m) => !(skipText && m.direction === 'in' && m.text === skipText));
+  const short = agent.memory.short.filter((m) => !(skipText && m.direction === 'in' && m.text === skipText)).slice(-8);
   const memory = short.map((m) => `- [J${m.day}] ${m.direction === 'in' ? 'reçu de' : 'envoyé à'} ${name(m.with)} : « ${m.text} »`);
 
   return [
@@ -142,9 +165,11 @@ function context(w: WorldState, agent: Agent, skipText?: string): string[] {
     `Tes voisins directs (par une route) : ${near.length ? near.map(who).join(', ') : 'personne, tu es isolé·e'}.`,
     far.length ? `Joignables seulement par relais : ${far.map(who).join(', ')}.` : '',
     today ? `Gazette du jour : déjà publiée (« ${today.headline} »).` : 'Gazette du jour : pas encore publiée.',
-    `Ce que tu penses des autres (de -1 à +1) : ${opinions.join(', ')}.`,
+    opinions.length ? `Ce que tu penses des autres (de -1 à +1) : ${opinions.join(', ')}.` : '',
     familyLine(w, agent),
     dossierLine(w, agent),
+    newsroomLine(w, agent),
+    placesLine(),
     stateLine(w, agent),
     rumorLine(w, agent),
     agent.memory.long ? `Ta mémoire des jours passés : ${agent.memory.long}` : '',
@@ -158,7 +183,7 @@ export function situationPrompt(w: WorldState, agent: Agent, trigger: Trigger): 
   let now: string;
   if (trigger.type === 'day') now = 'Une nouvelle journée commence.';
   else if (trigger.type === 'deadline')
-    now = 'Il est 19 h et la gazette du jour n’est toujours pas parue. Publie-la MAINTENANT (champ "publish") avec ce que contient le dossier, même imparfait.';
+    now = `Il est ${villageTime(w)} et la gazette du jour n’est toujours pas parue. Si le dossier contient un texte, publie-le MAINTENANT (champ "publish"), même imparfait ; sinon relance ton équipe pour qu’elle te l’envoie vite.`;
   else if (trigger.type === 'inject') now = `Un événement imprévu secoue le village : ${trigger.text}`;
   else {
     const m = trigger.msg;

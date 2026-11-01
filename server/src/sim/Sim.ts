@@ -20,7 +20,7 @@ import { nextHop, roadBetween } from './graph';
 import { Politics } from './politics';
 import { Life } from './life';
 import { Daily } from './daily';
-import { pushNews } from '../content/news';
+import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { neighbors } from './graph';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
@@ -31,12 +31,19 @@ const SHORT_MEMORY = 12;
 const RELAY_DELAY = 4;
 /** Les bulletins de vote sont portés au pas de course, pour arriver avant la clôture. */
 const BALLOT_SPEEDUP = 1.8;
+/** Les textes de la gazette voyagent aussi plus vite, pour paraître avant le soir. */
+const GAZETTE_SPEEDUP = 1.5;
+const GAZETTE_KINDS: MessageKind[] = ['task', 'topic', 'draft', 'edit', 'review'];
+/** Heures où l'on rappelle au maire que la gazette n'est pas parue. */
+const DEADLINE_HOURS = [16, 19];
 
 export type Action =
   | { type: 'send'; to: AgentId; kind: MessageKind; body: string; replyTo?: string }
   | { type: 'think'; text: string }
   | { type: 'publish'; gazette: Omit<Gazette, 'day' | 'publishedTick'> }
   | { type: 'opinion'; about: AgentId; delta: number; reason: string }
+  /** Aller à pied : 'place', 'foret', 'riviere', ou chez un habitant (son id). */
+  | { type: 'go'; place: string }
   | { type: 'ballot'; ballot: Omit<Ballot, 'tick' | 'voterId'> };
 
 /** Ce qui décide du comportement des agents (LLMProvider : mock, Anthropic ou Ollama). */
@@ -128,7 +135,7 @@ export class Sim {
     this.advanceMessages();
     this.runPending();
     this.politics.onTick(this);
-    if (this.dayTick === Math.round(this.clock.ticksPerDay * dayFraction(19))) this.brain.onDeadline?.(this);
+    if (DEADLINE_HOURS.some((h) => this.dayTick === Math.round(this.clock.ticksPerDay * dayFraction(h)))) this.brain.onDeadline?.(this);
     this.daily.onTick(this);
     tickEffects(this);
     this.brain.onTick?.(this);
@@ -247,6 +254,15 @@ export class Sim {
       case 'opinion':
         this.adjustOpinion(agentId, a.about, a.delta, a.reason);
         break;
+      case 'go': {
+        const nature = ['place', 'foret', 'riviere'].includes(a.place);
+        const target = nature ? a.place : this.agent(a.place)?.houseId;
+        if (!target || me.location?.kind === 'walking') break;
+        if (!this.daily.trip(this, me, target, nature ? 'promenade' : 'visite', 1.5)) {
+          this.emit('agent.thought', [agentId], `💭 ${me.name} : Aucune route ouverte pour y aller…`, { text: 'Aucune route ouverte pour y aller…' });
+        }
+        break;
+      }
       case 'ballot':
         this.politics.cast(this, agentId, a.ballot);
         break;
@@ -306,7 +322,7 @@ export class Sim {
       ballot: opts.ballot,
       createdTick: this.clock.tick,
       progress: 0,
-      speed: kind === 'ballot' ? WALK_SPEED * BALLOT_SPEEDUP : WALK_SPEED,
+      speed: kind === 'ballot' ? WALK_SPEED * BALLOT_SPEEDUP : GAZETTE_KINDS.includes(kind) ? WALK_SPEED * GAZETTE_SPEEDUP : WALK_SPEED,
       status: 'walking',
     };
     this.world.messages[msg.id] = msg;
@@ -368,8 +384,12 @@ export class Sim {
     if (msg.kind === 'topic') Object.assign(d, { topic: msg.body.replace(/^Sujet\s*:\s*/i, ''), topicBy: by });
     if (msg.kind === 'draft') Object.assign(d, { draft: msg.body, draftBy: by });
     if (msg.kind === 'edit') Object.assign(d, { edited: msg.body.replace(/^Version corrigée\s*:\s*/i, ''), editedBy: by });
-    if (msg.kind === 'review') {
-      const score = Number(msg.body.match(/([0-5])\s*\/\s*5/)?.[1] ?? 3);
+    // L'avis ne compte que s'il vient du lecteur (ou, faute de lecteur, de quelqu'un d'autre que le maire).
+    const hasReader = Object.values(this.world.agents).some((a) => a.role === 'LECTEUR');
+    const fromReader = hasReader ? this.agent(by)?.role === 'LECTEUR' : by !== this.world.mayorId;
+    if (msg.kind === 'review' && fromReader) {
+      const raw = msg.body.match(/(\d+(?:[.,]\d+)?)\s*\/\s*5/)?.[1];
+      const score = raw ? Math.min(5, Number(raw.replace(',', '.'))) : 3;
       d.review = { by, score, text: msg.body };
     }
     if (['topic', 'draft', 'edit', 'review'].includes(msg.kind)) this.broadcast({ type: 'patch', world: { gazetteDraft: d } });
@@ -482,6 +502,7 @@ export class Sim {
     this.life = new Life();
     this.daily = new Daily();
     this.journal.restart();
+    clearNews();
     this.broadcast({ type: 'snapshot', world: this.world, events: [] });
     this.emit('god.inject', [], preset === 'origine'
       ? '🔄 Nouvelle histoire : le hameau d’origine, ses cinq habitants et sa gazette.'
