@@ -191,6 +191,18 @@ export interface Gazette {
   publishedTick?: number;
 }
 
+/** Ce que la gazette du jour a déjà reçu, en entier : le jeu le tient à jour quand les messages arrivent. */
+export interface GazetteDraft {
+  day: number;
+  topic?: string;
+  topicBy?: AgentId;
+  draft?: string;
+  draftBy?: AgentId;
+  edited?: string;
+  editedBy?: AgentId;
+  review?: { by: AgentId; score: number; text: string };
+}
+
 // ─── Votes ───────────────────────────────────────────────────────────────────
 
 export interface Ballot {
@@ -297,6 +309,7 @@ export interface WorldState {
   voteEveryDays: number;
   effects: WorldEffect[];
   rumors: Rumor[];
+  gazetteDraft?: GazetteDraft;
   llm: {
     provider: LLMProviderName;
     /** Modèle utilisé (Claude ou Ollama). */

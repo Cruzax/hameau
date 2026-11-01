@@ -1,5 +1,6 @@
 import {
   createSeedWorld,
+  dayFraction,
   type VillagePreset,
   roadLength,
   type Agent,
@@ -28,6 +29,8 @@ import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
 const WALK_SPEED = 0.5;
 const SHORT_MEMORY = 12;
 const RELAY_DELAY = 4;
+/** Les bulletins de vote sont portés au pas de course, pour arriver avant la clôture. */
+const BALLOT_SPEEDUP = 1.8;
 
 export type Action =
   | { type: 'send'; to: AgentId; kind: MessageKind; body: string; replyTo?: string }
@@ -45,6 +48,8 @@ export interface Brain {
   onInject?(sim: Sim, text: string): void;
   /** Un vote de destitution s'ouvre : chaque agent doit envoyer un bulletin (action 'ballot'). */
   onVoteOpened?(sim: Sim, vote: VoteSession): void;
+  /** 19 h et pas de gazette : dernier rappel au maire. */
+  onDeadline?(sim: Sim): void;
 }
 
 /** Ce qui mérite d'être proposé comme sujet de gazette. */
@@ -123,6 +128,7 @@ export class Sim {
     this.advanceMessages();
     this.runPending();
     this.politics.onTick(this);
+    if (this.dayTick === Math.round(this.clock.ticksPerDay * dayFraction(19))) this.brain.onDeadline?.(this);
     this.daily.onTick(this);
     tickEffects(this);
     this.brain.onTick?.(this);
@@ -131,6 +137,7 @@ export class Sim {
 
   private startDay() {
     this.emit('day.start', [], `☀️ Jour ${this.clock.day} — le village se réveille.`);
+    this.world.gazetteDraft = { day: this.clock.day };
     this.daily.morning(this);
     this.brain.onDayStart(this);
   }
@@ -219,7 +226,18 @@ export class Sim {
         this.send(agentId, a.to, a.kind, a.body, { replyTo: a.replyTo });
         break;
       case 'publish': {
-        const g: Gazette = { ...a.gazette, day: this.clock.day, publishedTick: this.clock.tick, approvedBy: agentId };
+        const dossier = this.world.gazetteDraft;
+        const article = a.gazette.articles[0];
+        const body = dossier?.edited ?? dossier?.draft;
+        if (article && body && (article.body ?? '').length < body.length * 0.6) article.body = body;
+        if (article && dossier) Object.assign(article, { topicBy: dossier.topicBy, writtenBy: dossier.draftBy, editedBy: dossier.editedBy });
+        const g: Gazette = {
+          ...a.gazette,
+          review: a.gazette.review ?? dossier?.review,
+          day: this.clock.day,
+          publishedTick: this.clock.tick,
+          approvedBy: agentId,
+        };
         this.world.gazettes.push(g);
         this.emit('gazette.published', [agentId], `📰 La Gazette du jour ${g.day} paraît : « ${g.headline} »`, { gazette: g });
         this.daily.payGazette(this);
@@ -288,7 +306,7 @@ export class Sim {
       ballot: opts.ballot,
       createdTick: this.clock.tick,
       progress: 0,
-      speed: WALK_SPEED,
+      speed: kind === 'ballot' ? WALK_SPEED * BALLOT_SPEEDUP : WALK_SPEED,
       status: 'walking',
     };
     this.world.messages[msg.id] = msg;
@@ -343,7 +361,22 @@ export class Sim {
     this.receive(msg);
   }
 
+  /** Le dossier de la gazette se remplit quand le sujet, le brouillon, la correction ou l'avis arrivent. */
+  private fileGazette(msg: Message) {
+    const d = (this.world.gazetteDraft ??= { day: this.clock.day });
+    const by = msg.origin ?? msg.from;
+    if (msg.kind === 'topic') Object.assign(d, { topic: msg.body.replace(/^Sujet\s*:\s*/i, ''), topicBy: by });
+    if (msg.kind === 'draft') Object.assign(d, { draft: msg.body, draftBy: by });
+    if (msg.kind === 'edit') Object.assign(d, { edited: msg.body.replace(/^Version corrigée\s*:\s*/i, ''), editedBy: by });
+    if (msg.kind === 'review') {
+      const score = Number(msg.body.match(/([0-5])\s*\/\s*5/)?.[1] ?? 3);
+      d.review = { by, score, text: msg.body };
+    }
+    if (['topic', 'draft', 'edit', 'review'].includes(msg.kind)) this.broadcast({ type: 'patch', world: { gazetteDraft: d } });
+  }
+
   private receive(msg: Message) {
+    this.fileGazette(msg);
     if (msg.kind === 'ballot') this.politics.receive(this, msg);
     else this.brain.onMessage(this, this.agent(msg.to), msg);
   }

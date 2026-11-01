@@ -1,8 +1,8 @@
-import { dayFraction, type AgentId, type Ballot, type Message, type VoteSession } from '@hameau/shared';
+import { dayFraction, de, type AgentId, type Ballot, type Message, type VoteSession } from '@hameau/shared';
 import type { Sim } from './Sim';
 
-/** Le conseil s'ouvre à 13 h et les bulletins doivent être arrivés avant 20 h. */
-const OPEN_AT = dayFraction(13);
+/** Le conseil s'ouvre à 10 h et les bulletins doivent être arrivés avant 20 h. */
+const OPEN_AT = dayFraction(10);
 const CLOSE_AT = dayFraction(20);
 /** En dessous de cette opinion du maire, un agent est prêt à proposer sa destitution. */
 const MOTION_THRESHOLD = -0.05;
@@ -58,7 +58,7 @@ export class Politics {
     };
     w.votes.push(vote);
     sim.emit('vote.opened', [proposer.id, mayor],
-      `🗳️ ${proposer.name} demande la destitution de ${sim.agent(mayor).name} ! Les bulletins doivent arriver chez le maire avant 20 h.`,
+      `🗳️ ${proposer.name} demande la destitution ${de(sim.agent(mayor).name)} ! Les bulletins doivent arriver chez le maire avant 20 h.`,
       { voteId: vote.id });
     sim.touchVotes();
     sim.brain.onVoteOpened?.(sim, vote);
@@ -80,21 +80,23 @@ export class Politics {
     if (!b) return;
     const voter = sim.agent(b.voterId)?.name ?? 'Un ancien habitant';
     if (!vote || sim.clock.tick > vote.closesTick) {
-      sim.emit('vote.cast', [b.voterId], `⌛ Le bulletin de ${voter} arrive trop tard : il ne compte pas.`, { late: true });
+      sim.emit('vote.cast', [b.voterId], `⌛ Le bulletin ${de(voter)} arrive trop tard : il ne compte pas.`, { late: true });
       return;
     }
     if (vote.ballots.some((x) => x.voterId === b.voterId)) return;
     vote.ballots.push(b);
     const n = Object.keys(sim.world.agents).length;
-    sim.emit('vote.cast', [b.voterId], `📥 Le bulletin de ${voter} est dans l’urne (${vote.ballots.length}/${n}).`, { voteId: vote.id });
+    sim.emit('vote.cast', [b.voterId], `📥 Le bulletin ${de(voter)} est dans l’urne (${vote.ballots.length}/${n}).`, { voteId: vote.id });
     sim.touchVotes();
   }
 
   close(sim: Sim, vote: VoteSession) {
     const w = sim.world;
     const n = Object.keys(w.agents).length;
-    const yes = vote.ballots.filter((b) => b.destitute);
-    const tally: Record<string, number> = { pour: yes.length, contre: vote.ballots.length - yes.length, absents: n - vote.ballots.length };
+    // Seuls comptent les bulletins des habitants encore présents (certains ont pu partir pendant le vote).
+    const ballots = vote.ballots.filter((b) => w.agents[b.voterId]);
+    const yes = ballots.filter((b) => b.destitute);
+    const tally: Record<string, number> = { pour: yes.length, contre: ballots.length - yes.length, absents: Math.max(0, n - ballots.length) };
     for (const b of yes) if (b.candidateId) tally[b.candidateId] = (tally[b.candidateId] ?? 0) + 1;
     vote.status = 'closed';
 

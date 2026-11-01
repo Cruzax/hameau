@@ -26,7 +26,12 @@ export function createScript(seed = Date.now()) {
   const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
   const injected: string[] = [];
   let day: { topic?: string; edited?: string; review?: number } = {};
-  let lastTopic = '';
+  /** Sujets déjà traités : on ne publie pas deux fois la même nouvelle. */
+  const usedTopics = new Set<string>();
+  const freshNews = () => {
+    for (let n = takeNews(); n; n = takeNews()) if (!usedTopics.has(n)) return n;
+    return undefined;
+  };
 
   const byRole = (w: WorldState, role: Role): AgentId | undefined => Object.values(w.agents).find((a) => a.role === role)?.id;
 
@@ -48,6 +53,15 @@ export function createScript(seed = Date.now()) {
         if (!isMayor || !scout) return decision({});
         return decision({ thought: 'Nouvelle journée. Il nous faut une gazette !', messages: [{ to: scout, kind: 'task', body: pick(TASKS) }] });
       }
+      if (trigger.type === 'deadline') {
+        const d = w.gazetteDraft;
+        const headline = day.topic ?? d?.topic;
+        if (!isMayor || !headline) return decision({ thought: 'Pas de gazette aujourd’hui… le village va grogner.' });
+        return decision({
+          thought: 'Tant pis pour la perfection, on publie !',
+          publish: { headline, body: d?.edited ?? d?.draft ?? day.edited ?? headline },
+        });
+      }
       if (trigger.type === 'inject') {
         injected.push(trigger.text);
         return decision({ thought: 'Il faut que la gazette en parle !' });
@@ -60,8 +74,9 @@ export function createScript(seed = Date.now()) {
 
       if (agent.role === 'ECLAIREUR' && msg.kind === 'task' && writer) {
         // Priorité : un événement injecté, puis une vraie nouvelle du village, sinon un sujet de secours.
-        day.topic = injected.shift() ?? (rand() < 0.75 ? takeNews() : undefined) ?? pick(TOPICS.filter((t) => t !== lastTopic));
-        lastTopic = day.topic;
+        const unused = TOPICS.filter((t) => !usedTopics.has(t));
+        day.topic = injected.shift() ?? (rand() < 0.75 ? freshNews() : undefined) ?? pick(unused.length ? unused : TOPICS);
+        usedTopics.add(day.topic);
         return decision({ thought: pick(SCOUTING), messages: [{ to: writer, kind: 'topic', body: `Sujet : ${day.topic} !` }] });
       }
       if (agent.role === 'ECRIVAIN' && msg.kind === 'topic' && editor) {
@@ -69,7 +84,8 @@ export function createScript(seed = Date.now()) {
         return decision({ thought: 'Laissez-moi trouver les mots justes…', messages: [{ to: editor, kind: 'draft', body: draft }] });
       }
       if (agent.role === 'EDITEUR' && msg.kind === 'draft') {
-        day.edited = msg.body.split('.')[0] + '.';
+        // On resserre : les deux premières phrases suffisent.
+        day.edited = msg.body.split(/(?<=[.!?…])\s+/).slice(0, 2).join(' ');
         return decision({ thought: 'Trop long. Je coupe.', messages: [{ to: w.mayorId, kind: 'edit', body: day.edited }] });
       }
       if (isMayor && msg.kind === 'edit' && reader) {

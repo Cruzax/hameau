@@ -86,7 +86,9 @@ export function toActions(world: WorldState, agent: Agent, d: Decision): Action[
   for (const m of d.messages.slice(0, MAX_MESSAGES)) {
     const to = resolveAgent(world, m.to);
     if (!to || !m.body.trim()) continue;
-    actions.push({ type: 'send', to, kind: m.kind, body: clip(m.body, 280) });
+    // Les textes de la gazette ont droit à plus de place que les simples messages.
+    const limit = m.kind === 'draft' || m.kind === 'edit' ? 700 : 280;
+    actions.push({ type: 'send', to, kind: m.kind, body: clip(m.body, limit) });
   }
 
   for (const o of d.opinions.slice(0, 3)) {

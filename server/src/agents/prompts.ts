@@ -5,11 +5,12 @@ const DUTIES: Record<Role, string> = {
   MAIRE:
     'Tu coordonnes la gazette. Le matin, tu demandes un sujet à l’éclaireur. Quand l’éditeur te renvoie l’article corrigé, ' +
     'tu le transmets au lecteur pour avoir son avis. Après l’avis, tu tranches : publier (champ "publish", avec un titre ' +
-    'et le texte final) ou refuser. Toi seul peux publier, une fois par jour.',
+    'et le texte final). Toi seul peux publier, une fois par jour. La gazette doit paraître CHAQUE jour avant 20 h, ' +
+    'même imparfaite : un avis sévère se publie avec le reste, il ne bloque pas la parution.',
   ECLAIREUR: 'Quand on te le demande, tu trouves un sujet de gazette surprenant mais plausible pour un petit village, et tu l’envoies à l’écrivain.',
-  ECRIVAIN: 'Quand tu reçois un sujet, tu écris un court article (2-3 phrases) et tu l’envoies à l’éditeur.',
-  EDITEUR: 'Quand tu reçois un brouillon, tu le corriges et le resserres, puis tu envoies la version finale au maire.',
-  LECTEUR: 'Quand le maire te soumet un article, tu lui renvoies un avis franc avec une note sur 5.',
+  ECRIVAIN: 'Quand tu reçois un sujet, tu écris aussitôt un court article vivant (2-3 phrases, en entier dans ton message) et tu l’envoies à l’éditeur.',
+  EDITEUR: 'Quand tu reçois un brouillon, tu le corriges et le resserres, puis tu envoies la version finale (le texte complet) au maire.',
+  LECTEUR: 'Quand le maire te soumet un article, tu le notes tel quel (avis franc + note sur 5) sans réclamer d’autre version.',
   BOULANGER: 'Chaque matin tu cuis le pain (il te faut du bois) et tu le vends aux habitants, une pièce le pain.',
   FORGERON: 'Tu fabriques des outils et tu répares les ponts et les routes abîmés par la crue ou l’orage.',
   HERBORISTE: 'Tu soignes les malades contre quelques pièces, et tu sais garder (ou monnayer) les secrets qu’on te confie.',
@@ -36,7 +37,8 @@ export function systemPrompt(agent: Agent, isMayor: boolean): string {
     'RÈGLE DU MONDE : on ne communique qu’en envoyant un messager à pied le long des routes. Un message vers ' +
       'quelqu’un qui n’est pas ton voisin direct est relayé par d’autres habitants : c’est lent, et les relais le lisent. ' +
       'Si aucune route ne mène au destinataire, le message est perdu.',
-    'MISSION COMMUNE : produire chaque jour la gazette du village.',
+    'MISSION COMMUNE : produire chaque jour la gazette du village. C’est un petit journal plein d’anecdotes et de ' +
+      'rumeurs : on raconte, on ne prouve pas ; inutile de réclamer des chiffres ou des preuves, et personne ne bloque la parution.',
     `TON RÔLE : ${DUTIES[agent.role]}`,
     isMayor && agent.role !== 'MAIRE' ? `TU ES AUSSI LE MAIRE ÉLU : ${DUTIES.MAIRE}` : '',
     'POLITIQUE : tous les quelques jours, un habitant mécontent peut demander la destitution du maire. Chacun envoie ' +
@@ -58,7 +60,8 @@ export function systemPrompt(agent: Agent, isMayor: boolean): string {
 export type Trigger =
   | { type: 'day' }
   | { type: 'message'; msg: Message }
-  | { type: 'inject'; text: string };
+  | { type: 'inject'; text: string }
+  | { type: 'deadline' };
 
 function villageTime(w: WorldState) {
   const h = villageHour(w.clock.tick, w.clock.ticksPerDay);
@@ -93,6 +96,22 @@ function rumorLine(w: WorldState, agent: Agent): string {
   return heard.length ? `Ce que tu as entendu dire : ${heard.map((r) => `« ${r.text} »`).join(' ; ')}.` : '';
 }
 
+/** Le dossier de la gazette, visible de ceux qui la fabriquent. */
+function dossierLine(w: WorldState, agent: Agent): string {
+  const d = w.gazetteDraft;
+  const makers: Role[] = ['MAIRE', 'ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'];
+  if (!d || d.day !== w.clock.day || (!makers.includes(agent.role) && agent.id !== w.mayorId)) return '';
+  if (w.gazettes.some((g) => g.day === w.clock.day)) return '';
+  const name = (id?: string) => (id ? w.agents[id]?.name ?? '?' : '?');
+  const parts = [
+    d.topic ? `sujet (${name(d.topicBy)}) : « ${d.topic} »` : 'pas encore de sujet',
+    d.draft ? `brouillon (${name(d.draftBy)}) : « ${d.draft} »` : '',
+    d.edited ? `version corrigée (${name(d.editedBy)}) : « ${d.edited} »` : '',
+    d.review ? `avis (${name(d.review.by)}, ${d.review.score}/5) : « ${d.review.text} »` : '',
+  ].filter(Boolean);
+  return `Dossier de la gazette du jour — ${parts.join(' ; ')}.`;
+}
+
 function familyLine(w: WorldState, agent: Agent): string {
   const f = agent.family;
   if (!f) return '';
@@ -125,6 +144,7 @@ function context(w: WorldState, agent: Agent, skipText?: string): string[] {
     today ? `Gazette du jour : déjà publiée (« ${today.headline} »).` : 'Gazette du jour : pas encore publiée.',
     `Ce que tu penses des autres (de -1 à +1) : ${opinions.join(', ')}.`,
     familyLine(w, agent),
+    dossierLine(w, agent),
     stateLine(w, agent),
     rumorLine(w, agent),
     agent.memory.long ? `Ta mémoire des jours passés : ${agent.memory.long}` : '',
@@ -137,6 +157,8 @@ export function situationPrompt(w: WorldState, agent: Agent, trigger: Trigger): 
   const name = (id: string) => w.agents[id]?.name ?? id;
   let now: string;
   if (trigger.type === 'day') now = 'Une nouvelle journée commence.';
+  else if (trigger.type === 'deadline')
+    now = 'Il est 19 h et la gazette du jour n’est toujours pas parue. Publie-la MAINTENANT (champ "publish") avec ce que contient le dossier, même imparfait.';
   else if (trigger.type === 'inject') now = `Un événement imprévu secoue le village : ${trigger.text}`;
   else {
     const m = trigger.msg;

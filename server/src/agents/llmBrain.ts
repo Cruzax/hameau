@@ -5,11 +5,14 @@ import type { LLMProvider, LLMRequest } from '../llm/LLMProvider';
 import { DecisionSchema, SummarySchema, VoteSchema, toActions, voteActions } from './decision';
 import { situationPrompt, summaryPrompt, systemPrompt, votePrompt, type Trigger } from './prompts';
 import { CHATTER, createScript } from './scripted';
+import { LLM_CONFIG } from '../llm/config';
 
 /** Ticks entre la réponse du modèle et l'exécution (le temps d'enfiler son manteau). */
 const ACT_DELAY = 2;
 /** Probabilité de répondre à un simple bavardage (chaque réponse coûte un appel). */
 const CHAT_REPLY_CHANCE = 0.4;
+/** Appels LLM par habitant et par jour (le plafond ne descend jamais sous LLM_MAX_CALLS_PER_DAY). */
+const CALLS_PER_RESIDENT = 6;
 
 /**
  * Cerveau piloté par un LLMProvider. Un agent se « réveille » sur un déclencheur
@@ -83,12 +86,21 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
 
     onDayStart(sim) {
       script.newDay();
+      // Plus il y a d'habitants, plus il faut d'appels : le plafond suit la population.
+      const b = sim.world.llm.budget;
+      b.maxCallsPerDay = Math.max(LLM_CONFIG.maxCallsPerDay, CALLS_PER_RESIDENT * Object.keys(sim.world.agents).length);
+      sim.touchLLM();
       void wake(sim, sim.world.mayorId, { type: 'day' });
     },
 
     onMessage(sim, agent, msg) {
       if (msg.kind === 'chat' && script.rand() > CHAT_REPLY_CHANCE) return;
       void wake(sim, agent.id, { type: 'message', msg });
+    },
+
+    onDeadline(sim) {
+      if (sim.world.gazettes.some((g) => g.day === sim.clock.day)) return;
+      void wake(sim, sim.world.mayorId, { type: 'deadline' });
     },
 
     onInject(sim, text) {
