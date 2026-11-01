@@ -44,42 +44,128 @@ export const TOPICS = [
   'On cherche le propriétaire d’un parapluie rouge',
 ];
 
-export const DRAFTS: ((t: string) => string)[] = [
-  (t) => `${t}. Les habitants s’interrogent, et la rumeur enfle comme une marée d’automne.`,
-  (t) => `${t}. Personne n’a rien vu, mais tout le monde a un avis.`,
-  (t) => `${t}. Un mystère de plus pour notre paisible hameau.`,
-  (t) => `${t}. Notre enquête continue, et nos lecteurs seront les premiers informés.`,
-  (t) => `${t}. À l’auberge, on ne parle plus que de ça.`,
-  (t) => `${t}. Certains y voient un présage, d’autres une simple farce.`,
-  (t) => `${t}. Le maire n’a pas souhaité commenter.`,
-  (t) => `${t}. Un témoin, qui préfère rester anonyme, affirme avoir tout vu.`,
-  (t) => `${t}. Voilà qui alimentera les conversations au marché.`,
-  (t) => `${t}. Faut-il s’en inquiéter ? Le village est divisé.`,
-  (t) => `${t}. Nos anciens assurent que cela s’est déjà produit, il y a bien longtemps.`,
-  (t) => `${t}. La suite au prochain numéro.`,
-];
+/** De quoi parle un sujet : sert à varier l'article et l'avis du lecteur. */
+export type Theme = 'crime' | 'amour' | 'politique' | 'meteo' | 'fete' | 'sante' | 'village' | 'mystere';
 
-/** Avis du lecteur par note : des remarques qui conviennent à n'importe quel sujet. */
-export const REVIEW_COMMENTS: Record<number, string[]> = {
-  1: ['Du vent.', 'Je m’en servirai pour allumer le feu.', 'Rien appris, rien senti.'],
-  2: ['Le sujet méritait mieux.', 'Trop court pour en tirer quelque chose.', 'On a déjà oublié.'],
-  3: ['Correct, sans plus.', 'Il manque un détail qui accroche.', 'Ni chaud ni froid.'],
-  4: ['Enfin un sujet qui nous concerne.', 'Ça sent le vécu, j’aime.', 'Bien vu, et bien dit.'],
-  5: ['Je l’ai lu deux fois !', 'Le meilleur numéro de la semaine.', 'Tout le village va en parler.'],
+export function themeOf(topic: string): Theme {
+  const t = topic.toLowerCase();
+  if (/\bvol\b|\bvole|voleur|coupable|banni|accus|procès|innocent|enquête|rôd/.test(t)) return 'crime';
+  if (/couple|amour|naissance|\bmarié|mariage|fian|bébé|se fâchent|dispute/.test(t)) return 'amour';
+  if (/maire|vote|destitu|écharpe|conseil|lettre anonyme|impôt|route/.test(t)) return 'politique';
+  if (/orage|\bpluie|brouillard|\bcrue|neige|\bvent\b|tempête|soleil|\bgel\b|sécheresse/.test(t)) return 'meteo';
+  if (/fête|\bbal\b|danse|chant|violon|musique|fredonne|concours|banquet|marché|course/.test(t)) return 'fete';
+  if (/malade|soign|fièvre|herbor|tousse|guéri/.test(t)) return 'sante';
+  if (/nouveau|nouvelle maison|arrive|quitte|adulte|construit|boulang|forge|puits|pont|four/.test(t)) return 'village';
+  return 'mystere';
+}
+
+/** Ce que l'écrivain a sous la main pour broder : des habitants et un lieu. */
+export interface DraftCtx {
+  witness: string;
+  other: string;
+  place: string;
+}
+
+// Un article = une attaque + un développement + une chute. Jamais le titre recopié.
+export const DRAFT_LEADS: Record<Theme, ((c: DraftCtx) => string)[]> = {
+  crime: [
+    () => 'Le village ne dort plus tranquille.',
+    (c) => `C’est ${c.witness} qui a donné l’alerte, au petit matin.`,
+    () => 'Les volets se ferment plus tôt ces jours-ci.',
+    () => 'L’affaire agite toutes les maisons depuis l’aube.',
+  ],
+  amour: [
+    () => 'Le cœur du hameau bat un peu plus fort.',
+    (c) => `${c.witness} jure l’avoir senti venir depuis des semaines.`,
+    () => 'Les commères n’ont pas chômé.',
+    () => 'Une bonne nouvelle, pour une fois.',
+  ],
+  politique: [
+    () => 'La mairie est de nouveau au centre des conversations.',
+    (c) => `${c.witness} n’a pas mâché ses mots sur la place.`,
+    () => 'Le conseil n’a pas fini de faire parler de lui.',
+    () => 'Au village, chacun a désormais un avis sur la question.',
+  ],
+  meteo: [
+    () => 'Le ciel a encore décidé à notre place.',
+    (c) => `Depuis ${c.place}, le spectacle était saisissant.`,
+    () => 'Les anciens avaient prévenu, personne ne les a crus.',
+    () => 'Il a fallu rentrer le linge en courant.',
+  ],
+  fete: [
+    () => 'Le village avait bien besoin de souffler.',
+    (c) => `${c.witness} a dansé jusqu’à en perdre ses sabots.`,
+    () => 'On en parlera encore longtemps à l’auberge.',
+    () => 'Rires, chansons et quelques chopes renversées.',
+  ],
+  sante: [
+    () => 'L’herboristerie ne désemplit pas.',
+    (c) => `${c.witness} recommande une tisane de thym et du repos.`,
+    () => 'Une mauvaise passe, qui rappelle que l’hiver approche.',
+    () => 'Le village croise les doigts.',
+  ],
+  village: [
+    () => 'Le hameau change, un peu chaque jour.',
+    (c) => `${c.witness} a été parmi les premiers au courant.`,
+    () => 'Une page se tourne dans notre petit monde.',
+    () => 'Voilà qui va changer les habitudes de certains.',
+  ],
+  mystere: [
+    () => 'Personne n’a d’explication, mais tout le monde a une théorie.',
+    (c) => `${c.witness} affirme avoir tout vu depuis ${c.place}.`,
+    () => 'Le phénomène intrigue jusqu’aux plus sceptiques.',
+    () => 'L’affaire a commencé tôt ce matin, dans le plus grand silence.',
+  ],
 };
 
-/** Anciennes critiques toutes faites (gardées pour référence). */
-export const REVIEWS: [number, string][] = [
-  [4, 'Enfin un sujet qui nous concerne. 4/5.'],
-  [2, 'Trop lyrique, on n’y comprend rien. 2/5.'],
-  [3, 'Correct, mais où sont les faits ? 3/5.'],
-  [5, 'Je l’ai lu deux fois. 5/5 !'],
-  [1, 'Du vent. 1/5.'],
-  [4, 'Ça sent le vécu, j’aime. 4/5.'],
-  [3, 'Bien, mais le titre est mou. 3/5.'],
-  [2, 'On dirait une recette de cuisine. 2/5.'],
-  [5, 'Le meilleur numéro de l’année ! 5/5.'],
-  [3, 'Ni chaud ni froid. 3/5.'],
-  [1, 'Je m’en servirai pour allumer le feu. 1/5.'],
-  [4, 'Enfin du courage dans ce journal. 4/5.'],
+export const DRAFT_MIDDLES: ((c: DraftCtx) => string)[] = [
+  (c) => `${c.other} hausse les épaules : « On en a vu d’autres. »`,
+  (c) => `À en croire ${c.other}, ce n’est que le début.`,
+  () => 'À l’auberge, les avis sont partagés.',
+  (c) => `${c.witness} et ${c.other} ne sont pas d’accord sur les détails.`,
+  (c) => `On a vu du monde se rassembler vers ${c.place}.`,
+  () => 'Certains y voient un présage, d’autres une simple farce.',
+  (c) => `« Je l’avais dit ! », répète ${c.other} à qui veut l’entendre.`,
+  () => 'Un témoin, qui préfère rester anonyme, assure que ce n’est pas fini.',
+  () => 'Nos anciens disent que cela s’est déjà produit, il y a bien longtemps.',
+  (c) => `${c.other} propose d’en parler au prochain conseil.`,
 ];
+
+export const DRAFT_ENDINGS: string[] = [
+  'Faut-il s’en inquiéter ? Le village est divisé.',
+  'La suite au prochain numéro.',
+  'Notre enquête continue.',
+  'Le maire n’a pas souhaité commenter.',
+  'Voilà qui alimentera les conversations au marché.',
+  'Affaire à suivre, évidemment.',
+  'Nous tiendrons nos lecteurs informés.',
+  'Reste à savoir qui aura le dernier mot.',
+];
+
+// Avis du lecteur : une réaction selon la note, une remarque sur le thème, parfois sur la plume ou sur la veille.
+export const REVIEW_REACTIONS: Record<number, string[]> = {
+  1: ['Du vent.', 'Je m’en servirai pour allumer le feu.', 'Rien appris, rien senti.', 'J’ai décroché à la deuxième ligne.'],
+  2: ['Le sujet méritait mieux.', 'Trop court pour en tirer quelque chose.', 'On a déjà oublié.', 'Bof.'],
+  3: ['Correct, sans plus.', 'Il manque un détail qui accroche.', 'Ni chaud ni froid.', 'Ça se lit.'],
+  4: ['Bien vu, et bien dit.', 'Ça sent le vécu, j’aime.', 'Enfin un sujet qui nous concerne.', 'Agréable à lire.'],
+  5: ['Je l’ai lu deux fois !', 'Le meilleur numéro de la semaine.', 'Tout le village va en parler.', 'Chapeau.'],
+};
+
+export const REVIEW_ON_THEME: Record<Theme, { good: string[]; bad: string[] }> = {
+  crime: { good: ['On tremble avec le village.', 'Enfin une vraie enquête.'], bad: ['On accuse vite, ici.', 'Des rumeurs, pas des faits.'] },
+  amour: { good: ['Ça réchauffe le cœur.', 'Un peu de douceur, ça fait du bien.'], bad: ['Les histoires de cœur, ça ne me regarde pas.', 'Trop sucré pour moi.'] },
+  politique: { good: ['Courageux, vis-à-vis de la mairie.', 'Ça bouscule, et c’est tant mieux.'], bad: ['On sent la gazette du maire.', 'Trop prudent avec la mairie.'] },
+  meteo: { good: ['On s’y croirait, sous l’averse.', 'Bien raconté, ce ciel.'], bad: ['Parler de la pluie… vraiment ?', 'La météo, je la vois par ma fenêtre.'] },
+  fete: { good: ['On entend presque la musique.', 'Ça donne envie d’y retourner.'], bad: ['Et ceux qui n’étaient pas invités ?', 'Beaucoup de bruit pour une fête.'] },
+  sante: { good: ['Touchant, et utile.', 'Bon conseil de tisane.'], bad: ['Un peu triste pour un matin.', 'Laissez les malades tranquilles.'] },
+  village: { good: ['C’est notre village, ça.', 'Bon à savoir.'], bad: ['Tout le monde était déjà au courant.', 'Rien de neuf sous le clocher.'] },
+  mystere: { good: ['Intrigant, je veux la suite.', 'Ça fait jaser, bravo.'], bad: ['On n’y croit pas une seconde.', 'Encore une légende de comptoir.'] },
+};
+
+export const REVIEW_SAME_THEME = ['Encore ce genre de sujet ?', 'On tourne en rond, non ?', 'Toujours la même chanson.'];
+export const REVIEW_BETTER = ['Mieux qu’hier.', 'En progrès !', 'Ça remonte.'];
+export const REVIEW_WORSE = ['Moins bon qu’hier.', 'On a connu mieux cette semaine.', 'Petite baisse de forme.'];
+export const REVIEW_WRITER = {
+  good: [(w: string) => `${w} a la plume en forme.`, (w: string) => `On reconnaît le style de ${w}.`],
+  bad: [(w: string) => `${w} peut mieux faire.`, (w: string) => `${w} a écrit ça les yeux fermés ?`],
+};

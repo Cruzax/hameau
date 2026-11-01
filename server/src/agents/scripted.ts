@@ -1,7 +1,10 @@
 import { mulberry32, type Agent, type AgentId, type Role, type VoteSession, type WorldState } from '@hameau/shared';
 import type { Decision, VoteDecision } from './decision';
 import type { Trigger } from './prompts';
-import { DRAFTS, REVIEW_COMMENTS, TOPICS } from '../content/gazette';
+import {
+  DRAFT_ENDINGS, DRAFT_LEADS, DRAFT_MIDDLES, REVIEW_BETTER, REVIEW_ON_THEME, REVIEW_REACTIONS, REVIEW_SAME_THEME, REVIEW_WORSE,
+  REVIEW_WRITER, TOPICS, themeOf, type Theme,
+} from '../content/gazette';
 import { takeNews } from '../content/news';
 import { neighbors } from '../sim/graph';
 
@@ -28,7 +31,18 @@ export function createScript(seed = Date.now()) {
   let day: { topic?: string; edited?: string; review?: number } = {};
   /** Sujets déjà traités : on ne publie pas deux fois la même nouvelle. */
   const usedTopics = new Set<string>();
-  const recentDrafts: number[] = [];
+  /** Tournures récemment employées : on évite de se répéter d'un numéro à l'autre. */
+  const recent: string[] = [];
+  const fresh = <T,>(xs: T[], key: (x: T) => string = String): T => {
+    const left = xs.filter((x) => !recent.includes(key(x)));
+    const chosen = pick(left.length ? left : xs);
+    recent.push(key(chosen));
+    if (recent.length > 24) recent.shift();
+    return chosen;
+  };
+  /** Ce dont le lecteur se souvient des numéros précédents. */
+  const readerLog: { theme: Theme; score: number }[] = [];
+  const PLACES = ['la place', 'la rivière', 'la lisière de la forêt', 'le pont', 'le puits'];
   const freshNews = () => {
     for (let n = takeNews(); n; n = takeNews()) if (!usedTopics.has(n)) return n;
     return undefined;
@@ -81,27 +95,44 @@ export function createScript(seed = Date.now()) {
         return decision({ thought: pick(SCOUTING), messages: [{ to: writer, kind: 'topic', body: `Sujet : ${day.topic} !` }] });
       }
       if (agent.role === 'ECRIVAIN' && msg.kind === 'topic' && editor) {
-        // Pas deux fois de suite la même formule de conclusion.
-        const fresh = DRAFTS.filter((_, i) => !recentDrafts.includes(i));
-        const chosen = fresh[Math.floor(rand() * fresh.length)];
-        recentDrafts.push(DRAFTS.indexOf(chosen));
-        if (recentDrafts.length > 6) recentDrafts.shift();
-        const draft = chosen(day.topic ?? msg.body.replace(/^Sujet : |\s*!$/g, ''));
+        // Attaque + développement + chute, avec de vrais habitants ; le titre n'est pas recopié.
+        const topic = day.topic ?? msg.body.replace(/^Sujet : |\s*!$/g, '');
+        const names = Object.values(w.agents).filter((x) => x.id !== agent.id).map((x) => x.name);
+        const witness = pick(names) ?? 'Un voisin';
+        const ctx = { witness, other: pick(names.filter((n) => n !== witness)) ?? 'un voisin', place: pick(PLACES) };
+        const lead = fresh(DRAFT_LEADS[themeOf(topic)], (f) => f(ctx).slice(0, 20))(ctx);
+        const middle = fresh(DRAFT_MIDDLES, (f) => f(ctx).slice(-20))(ctx);
+        const draft = [lead, middle, fresh(DRAFT_ENDINGS)].join(' ');
         return decision({ thought: 'Laissez-moi trouver les mots justes…', messages: [{ to: editor, kind: 'draft', body: draft }] });
       }
       if (agent.role === 'EDITEUR' && msg.kind === 'draft') {
-        // On resserre : les deux premières phrases suffisent.
-        day.edited = msg.body.split(/(?<=[.!?…])\s+/).slice(0, 2).join(' ');
+        // On resserre, parfois : la phrase du milieu saute une fois sur deux.
+        // Coupe entre deux phrases, jamais au milieu d'une citation « … ».
+        const parts = msg.body.split(/(?<=[.!?…]|[.!?…] »)\s+(?=[A-ZÀ-Ý«])/);
+        day.edited = (parts.length > 2 && rand() < 0.5 ? [parts[0], ...parts.slice(2)] : parts).join(' ');
         return decision({ thought: 'Trop long. Je coupe.', messages: [{ to: w.mayorId, kind: 'edit', body: day.edited }] });
       }
       if (isMayor && msg.kind === 'edit' && reader) {
         return decision({ messages: [{ to: reader, kind: 'task', body: `Ton avis avant publication ? « ${msg.body} »` }] });
       }
       if (agent.role === 'LECTEUR' && msg.kind === 'task') {
-        const score = 1 + Math.floor(rand() * 5);
+        // La note dépend de l'humeur du lecteur, de la nouveauté du thème et de la longueur du texte.
+        const theme = themeOf(day.topic ?? '');
+        const last = readerLog.at(-1);
+        const same = readerLog.slice(-2).filter((r) => r.theme === theme).length;
+        const words = (day.edited ?? '').split(/\s+/).length;
+        const mood = agent.needs?.humeur ?? 0.6;
+        const score = Math.max(1, Math.min(5, Math.round(0.9 + mood * 2 + (words > 25 ? 0.5 : 0) - same * 0.8 + rand() * 2.8)));
         day.review = score;
-        const subject = (day.topic ?? '').split(/[:;,]/)[0].trim();
-        const text = `${subject ? `« ${subject} » : ` : ''}${pick(REVIEW_COMMENTS[score])} ${score}/5.`;
+        const good = score >= 4;
+        const bits = [fresh(REVIEW_REACTIONS[score])];
+        if (same >= 1 && !good) bits.push(fresh(REVIEW_SAME_THEME));
+        else if (rand() < 0.7) bits.push(fresh(good || (score === 3 && rand() < 0.5) ? REVIEW_ON_THEME[theme].good : REVIEW_ON_THEME[theme].bad));
+        if (last && score - last.score >= 2) bits.push(fresh(REVIEW_BETTER));
+        else if (last && last.score - score >= 2) bits.push(fresh(REVIEW_WORSE));
+        else if (writer && rand() < 0.35) bits.push(fresh(good ? REVIEW_WRITER.good : REVIEW_WRITER.bad, (f) => f(''))(w.agents[writer].name));
+        readerLog.push({ theme, score });
+        const text = `${bits.join(' ')} ${score}/5.`;
         return decision({ messages: [{ to: w.mayorId, kind: 'review', body: text }] });
       }
       if (isMayor && msg.kind === 'review' && day.topic) {
