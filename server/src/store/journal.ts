@@ -20,9 +20,11 @@ export class Journal {
   }
 
   append(e: Omit<SimEvent, 'seq' | 'at'>): SimEvent {
-    const event: SimEvent = { ...e, seq: ++this.seq, at: new Date().toISOString() };
+    const line = JSON.stringify({ ...e, seq: ++this.seq, at: new Date().toISOString() });
+    // Copie figée : l'export montre l'état au moment de l'événement, pas l'état final du monde.
+    const event: SimEvent = JSON.parse(line);
     this.events.push(event);
-    appendFileSync(this.file, JSON.stringify(event) + '\n');
+    appendFileSync(this.file, line + '\n');
     return event;
   }
 }

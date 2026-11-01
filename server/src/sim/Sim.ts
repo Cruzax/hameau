@@ -393,7 +393,7 @@ export class Sim {
     const hasReader = Object.values(this.world.agents).some((a) => a.role === 'LECTEUR');
     const fromReader = hasReader ? this.agent(by)?.role === 'LECTEUR' : by !== this.world.mayorId;
     if (msg.kind === 'review' && fromReader) {
-      const raw = msg.body.match(/(\d+(?:[.,]\d+)?)\s*\/\s*5/)?.[1];
+      const raw = msg.body.match(/(\d+(?:[.,]\d+)?)\s*(?:\/|sur)\s*5\b/)?.[1];
       const score = raw ? Math.min(5, Number(raw.replace(',', '.'))) : 3;
       d.review = { by, score, text: msg.body };
     }

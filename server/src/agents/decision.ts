@@ -89,7 +89,8 @@ export function toActions(world: WorldState, agent: Agent, d: Decision): Action[
   // Un agent peut s'écrire à lui-même quand il cumule deux rôles (ex. maire et éclaireur).
   for (const m of d.messages.slice(0, MAX_MESSAGES)) {
     const to = resolveAgent(world, m.to);
-    if (!to || !m.body.trim()) continue;
+    // Une réponse vide ou tronquée (« x », « … ») ne part pas.
+    if (!to || m.body.replace(/[^\p{L}\p{N}]/gu, '').length < 4) continue;
     // Les textes de la gazette ont droit à plus de place que les simples messages.
     const limit = m.kind === 'draft' || m.kind === 'edit' ? 700 : 280;
     actions.push({ type: 'send', to, kind: m.kind, body: clip(m.body, limit) });

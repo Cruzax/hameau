@@ -201,7 +201,8 @@ export function votePrompt(w: WorldState, agent: Agent, vote: VoteSession): stri
   return [
     ...context(w, agent),
     '',
-    `MAINTENANT : ${name(vote.proposerId)} demande la destitution du maire (${target}). Le conseil vote aujourd’hui.`,
+    `MAINTENANT : ${vote.proposerId === agent.id ? 'TU as toi-même lancé cette motion pour demander' : `${name(vote.proposerId)} demande`} la destitution du maire (${target}). Le conseil vote aujourd’hui.`,
+    vote.proposerId === agent.id ? 'Sauf si tu as vraiment changé d’avis, vote pour la destitution (destitute: true).' : '',
     `Candidats possibles : ${vote.candidates.map((id) => `${name(id)} (id: ${id})`).join(', ')}.`,
     'Remplis ton bulletin secret. Tu peux aussi envoyer un message de campagne à un habitant.',
   ]

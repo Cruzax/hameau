@@ -133,8 +133,24 @@ const FLIRT: [string, string][] = [
   ['Tes yeux brillent plus que la lune.', 'Arrête, tu me fais rougir.'],
   ['Je pense souvent à toi, tu sais.', 'Moi aussi… plus que je ne le devrais.'],
   ['Viendras-tu danser à la prochaine fête ?', 'Seulement si c’est avec toi.'],
-  ['Je t’ai cueilli une fleur près du moulin.', 'Elle est magnifique.'],
+  ['Je t’ai cueilli une fleur près de la rivière.', 'Elle est magnifique.'],
 ];
+/** Entre parents et enfants, ou entre frères et sœurs : de la tendresse, jamais de flirt. */
+const KIN: [string, string][] = [
+  ['Tu as bien mangé, au moins ?', 'Oui, ne t’inquiète pas pour moi.'],
+  ['Passe à la maison ce soir, il reste de la soupe.', 'J’apporterai du pain.'],
+  ['Tu grandis trop vite.', 'C’est toi qui le dis à chaque fois !'],
+  ['Je suis fier de toi, tu sais.', 'Merci… ça compte beaucoup.'],
+  ['Tu te souviens quand tu tombais dans la rivière ?', 'Ne raconte pas ça à tout le monde !'],
+  ['Couvre-toi, le vent se lève.', 'Oui, oui…'],
+];
+
+/** Même famille (parent, enfant, frère ou sœur) ? */
+const kin = (a: Agent, b: Agent) => {
+  const pa = a.family?.parentIds ?? [];
+  const pb = b.family?.parentIds ?? [];
+  return pa.includes(b.id) || pb.includes(a.id) || pa.some((p) => pb.includes(p));
+};
 const HOSTILE: [string, string][] = [
   ['Toi, je ne te parle pas.', 'Ça tombe bien.'],
   ['Je sais ce que tu as dit sur moi.', 'Je n’ai dit que la vérité.'],
@@ -156,9 +172,16 @@ export function chooseExchange(c: TalkContext): Exchange {
     const [line, reply] = pick(HOSTILE);
     return { line, reply, bond: -0.05 };
   }
+  if (kin(c.speaker, c.listener) && Math.random() < 0.5) {
+    const [line, reply] = pick(KIN);
+    return { line, reply, bond: 0.04 };
+  }
   const partners = c.speaker.family?.partnerId === c.listener.id;
+  // On ne flirte qu'avec son partenaire, ou entre célibataires sans lien de famille.
+  const single = (x: Agent) => !x.family?.partnerId;
+  const mayFlirt = partners || (c.mutual > 0.6 && single(c.speaker) && single(c.listener) && !kin(c.speaker, c.listener));
   if ((partners || c.mutual > 0.55) && Math.random() < 0.5) {
-    const [line, reply] = pick(c.mutual > 0.6 || partners ? FLIRT : FRIENDLY);
+    const [line, reply] = pick(mayFlirt ? FLIRT : FRIENDLY);
     return { line, reply, bond: 0.05 };
   }
   const situational = SITUATIONS.filter((s) => s.when(c) && s.lines.length);
