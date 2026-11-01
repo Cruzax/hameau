@@ -16,7 +16,7 @@ export const CHATTER: Partial<Record<Role, string[]>> = {
   ECRIVAIN: ['Je cherche une rime à « rivière »…', 'L’éditeur va encore tout couper.'],
   EDITEUR: ['Trois fautes dans ta dernière lettre.', 'Sois bref.'],
   LECTEUR: ['On ne m’écoute jamais, de ce côté du pont.', 'La gazette d’hier était longue.'],
-  CITOYEN: ['Ah, c’était mieux quand j’étais maire.', 'Tu as des nouvelles de la mairie ?'],
+  CITOYEN: ['Belle journée pour couper du bois.', 'Tu as des nouvelles de la mairie ?'],
 };
 
 const decision = (d: Partial<Decision>): Decision => ({ thought: '', messages: [], publish: null, opinions: [], go: null, ...d });
