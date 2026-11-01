@@ -1,4 +1,4 @@
-import { mulberry32, type Agent, type AgentId, type Role } from '@hameau/shared';
+import { de, mulberry32, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { neighbors } from './graph';
 import { buildRoad, houseName, newHouse, slug } from './god';
@@ -42,6 +42,7 @@ export class Life {
     this.couples(sim);
     this.births(sim);
     this.comingOfAge(sim);
+    this.fillGazette(sim);
     this.roadRequests(sim);
     this.departures(sim);
     this.newcomers(sim);
@@ -164,9 +165,24 @@ export class Life {
     w.agents[id] = child;
     this.family(a).childIds.push(id);
     this.family(b).childIds.push(id);
-    sim.emit('agent.born', [id, a.id, b.id], `👶 ${name} est né·e chez ${a.name} et ${b.name} !`, { agentId: id, agent: child });
+    sim.emit('agent.born', [id, a.id, b.id], `👶 Naissance de ${name} chez ${a.name} et ${b.name} !`, { agentId: id, agent: child });
     sim.daily.scheduleParty(sim, `on fête la naissance de ${name}`);
     sim.touchAgents();
+  }
+
+  /** Un poste de la gazette reste vide (bannissement, départ) ? Un habitant sans métier s'y propose. */
+  private fillGazette(sim: Sim) {
+    const w = sim.world;
+    for (const role of ['ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'] as Role[]) {
+      if (Object.values(w.agents).some((x) => x.role === role)) continue;
+      const free = Object.values(w.agents).filter((x) => x.role === 'CITOYEN' && w.houses[x.houseId]?.ownerId === x.id);
+      const who = free.sort((x, y) => (y.opinions[w.mayorId] ?? 0) - (x.opinions[w.mayorId] ?? 0))[0];
+      if (!who) continue;
+      who.role = role;
+      sim.emit('life.work', [who.id], `📰 La gazette manquait de bras : ${who.name} devient ${ROLE_LABEL[role].toLowerCase()}.`, { work: 'role', agentId: who.id, role });
+      this.remember(who, `J${sim.clock.day} : je travaille désormais pour la gazette.`);
+      sim.touchAgents();
+    }
   }
 
   private comingOfAge(sim: Sim) {
@@ -177,13 +193,16 @@ export class Life {
       if (sim.clock.day - a.bornDay < ADULT_AFTER_DAYS || home?.ownerId === a.id) continue;
       // Un métier vacant dans la gazette ? L'enfant le reprend.
       const vacant = (['ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'] as Role[]).find((r) => !Object.values(w.agents).some((x) => x.role === r));
-      const role = vacant ?? 'CITOYEN';
+      // Un village qui grandit a besoin d'une boulangerie de plus (une pour dix habitants).
+      const bakers = Object.values(w.agents).filter((x) => x.role === 'BOULANGER').length;
+      const needBaker = Object.keys(w.agents).length > 10 * Math.max(1, bakers);
+      const role: Role = vacant ?? (needBaker ? 'BOULANGER' : 'CITOYEN');
       const house = home && newHouse(sim, a.id, home, role);
       if (!house) continue;
       w.houses[house.id] = house;
       a.houseId = house.id;
       a.role = role;
-      sim.emit('house.built', [a.id], `🏠 ${a.name} est adulte et construit sa maison${vacant ? ` — et devient ${role.toLowerCase()}` : ''} !`, { agentId: a.id, house });
+      sim.emit('house.built', [a.id], `🏠 ${a.name} est adulte et construit sa maison${role !== 'CITOYEN' ? ` — nouveau métier : ${ROLE_LABEL[role].toLowerCase()}` : ''} !`, { agentId: a.id, house });
       this.remember(a, `J${sim.clock.day} : j’ai construit ma propre maison.`);
       sim.broadcastPatch({ houses: w.houses });
       sim.touchAgents();
@@ -205,12 +224,13 @@ export class Life {
       const esteem = ((mayor.opinions[a.id] ?? 0) + (mayor.opinions[b.id] ?? 0)) / 2;
       const yes = mayor.id === a.id || mayor.id === b.id || esteem >= 0;
       const asked = mayor.id === a.id || mayor.id === b.id
-        ? `📜 ${mayor.name}, en tant que maire, décide de relier sa maison à celle de ${(mayor.id === a.id ? b : a).name}.`
+        ? `📜 ${mayor.name}, en tant que maire, décide de relier sa maison à celle ${de((mayor.id === a.id ? b : a).name)}.`
         : `📜 ${a.name} et ${b.name}, lassés des relais, demandent une route à ${mayor.name}… ${yes ? 'accordée !' : 'refusée.'}`;
       sim.emit('road.built', [a.id, b.id, mayor.id], asked,
         { request: true, granted: yes });
       if (yes) buildRoad(sim, a.houseId, b.houseId);
       else for (const x of [a, b]) sim.adjustOpinion(x.id, mayor.id, -0.2, 'Le maire nous a refusé notre route');
+      break; // une seule demande traitée par soir
     }
   }
 
@@ -234,7 +254,7 @@ export class Life {
         delete o.opinions[a.id];
         if (o.family?.partnerId === a.id) delete o.family.partnerId;
       }
-      sim.emit('agent.left', [a.id], `🧳 ${a.name} quitte le village${days >= 2 ? ', coupé·e de tout' : ', personne ne l’aime ici'}.`, { agentId: a.id });
+      sim.emit('agent.left', [a.id], `🧳 ${a.name} quitte le village${days >= 2 ? ', faute de route pour rejoindre les autres' : ', faute d’amis ici'}.`, { agentId: a.id });
       sim.broadcastPatch({ houses: w.houses });
       sim.touchAgents();
       return; // un départ par soir au plus
@@ -248,7 +268,11 @@ export class Life {
     const name = this.pick(NAMES.filter((n) => !taken.has(n)));
     if (!name) return;
     const id = slug(sim, name);
-    const role: Role = this.rand() < 0.15 ? 'MENTEUR' : 'CITOYEN';
+    const r = this.rand();
+    // Un village qui grandit attire aussi un boulanger de plus (une boulangerie pour dix habitants).
+    const bakers = Object.values(w.agents).filter((x) => x.role === 'BOULANGER').length;
+    const needBaker = Object.keys(w.agents).length >= 10 * Math.max(1, bakers);
+    const role: Role = needBaker ? 'BOULANGER' : r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
     const empty = Object.values(w.houses).find((h) => !h.ownerId);
     const near = this.pick(Object.values(w.houses));
     const house = empty ?? (near && newHouse(sim, id, near, role));
@@ -260,7 +284,7 @@ export class Life {
       personality: {
         traits: [this.pick(TRAITS), this.pick(TRAITS)],
         tone: role === 'MENTEUR' ? 'mielleux, plein de sous-entendus' : 'curieux, un peu timide',
-        honesty: role === 'MENTEUR' ? 0.15 : 0.5 + this.rand() * 0.4,
+        honesty: role === 'MENTEUR' || role === 'VOLEUR' ? 0.15 : 0.3 + this.rand() * 0.6,
         ambition: this.rand(),
       },
       goals: role === 'MENTEUR' ? ['Semer la zizanie sans se faire prendre'] : ['Se faire accepter au village'],
@@ -277,7 +301,7 @@ export class Life {
     }
     w.agents[id] = agent;
     const where = empty ? `reprend la maison vide` : `s’installe près de chez ${houseName(sim, near.id)}`;
-    sim.emit('agent.added', [id], `🚶 Un·e inconnu·e arrive : ${name} ${where}.`, { agentId: id, role, agent, house });
+    sim.emit('agent.added', [id], `🚶 Quelqu’un de nouveau au village : ${name} ${where}.`, { agentId: id, role, agent, house });
     sim.broadcastPatch({ houses: w.houses });
     sim.touchAgents();
     if (!empty && near) buildRoad(sim, house.id, near.id);

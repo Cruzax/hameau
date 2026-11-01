@@ -160,8 +160,7 @@ export class Daily {
       if (text) sim.emit('village.event', [], text, { event: t.ev.id });
     }
     if (this.at(sim, 12)) {
-      const baker = this.byRole(sim, 'BOULANGER');
-      if (baker) this.bake(sim, baker, 2);
+      for (const b of Object.values(sim.world.agents)) if (b.role === 'BOULANGER') this.bake(sim, b, Math.ceil(this.batchSize(sim) / 2));
     }
     if (this.party && this.party.day === sim.clock.day && this.at(sim, this.party.hour)) this.startParty(sim);
 
@@ -236,7 +235,7 @@ export class Daily {
       const inv = this.inv(a);
       if (a.role === 'BOULANGER') {
         if (inv.bois > 0) {
-          this.bake(sim, a, BAKES_PER_BATCH);
+          this.bake(sim, a, this.batchSize(sim));
         } else {
           sim.emit('life.work', [a.id], `🪵 Pas de bois chez ${a.name} : pas de pain ce matin !`, { work: 'pain', failed: true });
           this.needs(a).humeur = clamp01(this.needs(a).humeur - 0.15);
@@ -259,7 +258,7 @@ export class Daily {
         if (mi.pieces >= 2) {
           mi.pieces -= 2;
           inv.pieces += 2;
-        } else sim.adjustOpinion(a.id, mayor.id, -0.1, 'Le maire ne m’a pas payé·e');
+        } else sim.adjustOpinion(a.id, mayor.id, -0.1, 'Le maire a oublié mon salaire');
       }
     }
     // Maladies du jour (plus fréquentes après un orage).
@@ -301,11 +300,24 @@ export class Daily {
     sim.emit('life.work', [a.id], `🍞 ${a.name} sort ${wood * BREAD_PER_WOOD} pains du four.`, { work: 'pain', qty: wood * BREAD_PER_WOOD });
   }
 
+  /** Bûches enfournées le matin : assez pour nourrir tout le village (6 pains par bûche). */
+  private batchSize(sim: Sim) {
+    const bakers = Object.values(sim.world.agents).filter((a) => a.role === 'BOULANGER').length || 1;
+    return Math.max(BAKES_PER_BATCH, Math.ceil(Object.keys(sim.world.agents).length / (4 * bakers)));
+  }
+
+  /** La boulangerie la mieux fournie (s'il y en a plusieurs). */
+  private bestBaker(sim: Sim, buyer: Agent) {
+    return Object.values(sim.world.agents)
+      .filter((b) => b.role === 'BOULANGER' && b.id !== buyer.id)
+      .sort((x, y) => this.inv(y).pain - this.inv(x).pain)[0];
+  }
+
   fallSick(sim: Sim, a: Agent) {
     const n = this.needs(a);
     if (n.sante < 0.6) return;
     n.sante = 0.35;
-    sim.emit('health.sick', [a.id], `🤒 ${a.name} est tombé·e malade.`);
+    sim.emit('health.sick', [a.id], `🤒 ${a.name} tombe malade.`);
     createRumor(sim, a.id, 'malade', a.id, true);
   }
 
@@ -319,7 +331,10 @@ export class Daily {
 
     // La nuit, on rentre et on dort… sauf le vagabond, qui a d'autres projets.
     if (night) {
-      if (a.role === 'VOLEUR' && home && hour >= 1 && hour < 3 && Math.random() < (n.satiete < 0.6 ? 0.5 : 0.2)) {
+      // Le vagabond vole par habitude ; un habitant peu honnête et affamé, sans pain ni sou, peut craquer.
+      const desperate = a.personality.honesty < 0.55 && n.satiete < 0.3 && inv.pain === 0 && inv.pieces < BREAD_PRICE;
+      const urge = a.role === 'VOLEUR' ? (n.satiete < 0.6 ? 0.5 : 0.2) : desperate ? 0.35 : 0;
+      if (urge && home && hour >= 1 && hour < 3 && Math.random() < urge) {
         const target = this.richestHouse(sim, a);
         if (target && this.trip(sim, a, target, 'vol', 0.3)) return;
       }
@@ -345,7 +360,7 @@ export class Daily {
     if (n.sante < 0.5 && healer && healer.id !== a.id && this.trip(sim, a, healer.houseId, 'soin', 0.7)) return;
 
     // Faim et plus de pain : à la boulangerie.
-    const baker = this.byRole(sim, 'BOULANGER');
+    const baker = this.bestBaker(sim, a);
     const broke = inv.pieces < BREAD_PRICE && n.satiete < 0.25;
     if (canShop && n.satiete < 0.55 && inv.pain === 0 && (inv.pieces >= BREAD_PRICE || broke) && baker && baker.id !== a.id && hour < 19) {
       this.nextShop.set(a.id, sim.clock.tick + 30);
@@ -353,12 +368,18 @@ export class Daily {
     }
 
     // Boulanger et forgeron à court de bois : ils vont en acheter.
-    const lowWood = a.role === 'BOULANGER' ? inv.bois < 3 : inv.bois === 0;
+    const lowWood = a.role === 'BOULANGER' ? inv.bois < this.batchSize(sim) : inv.bois === 0;
     if (canShop && (a.role === 'BOULANGER' || a.role === 'FORGERON') && lowWood && inv.pieces >= 2 * WOOD_PRICE && hour < 17) {
       this.nextShop.set(a.id, sim.clock.tick + 30);
       const seller = Object.values(sim.world.agents)
         .filter((x) => x.id !== a.id && x.role !== 'BOULANGER' && x.role !== 'FORGERON' && this.inv(x).bois >= 2).sort((x, y) => this.inv(y).bois - this.inv(x).bois)[0];
       if (seller && this.trip(sim, a, seller.houseId, 'acheter', 0.4)) return;
+    }
+
+    // Sans le sou pour acheter du bois, le boulanger va le couper lui-même.
+    if (a.role === 'BOULANGER' && lowWood && inv.pieces < 2 * WOOD_PRICE && hour >= 8 && hour < 15 && !this.cutToday.has(a.id) && sim.clock.tick >= this.forestClosedUntil) {
+      this.cutToday.add(a.id);
+      if (this.trip(sim, a, 'foret', 'travail', 1.5)) return;
     }
 
     // L'aubergiste va chercher le pain du soir à 8 h.
@@ -445,7 +466,7 @@ export class Daily {
             oi.pain--;
             inv.pain++;
             sim.emit('life.trade', [owner.id, a.id], `🤲 ${owner.name} offre un pain à ${a.name}, qui n’a plus un sou.`, { item: 'pain', qty: 1, gift: true });
-            sim.adjustOpinion(a.id, owner.id, 0.15, 'On m’a nourri·e quand je n’avais rien');
+            sim.adjustOpinion(a.id, owner.id, 0.15, 'Du pain offert quand je n’avais rien');
             break;
           }
           if (qty > 0) {
@@ -646,7 +667,7 @@ export class Daily {
   private highlight(sim: Sim): string {
     const today = sim.journal.events.filter((e) => e.day === sim.clock.day);
     const pick = (types: string[]) => [...today].reverse().find((e) => types.includes(e.type));
-    const e = pick(['trial.verdict', 'mayor.elected', 'crime.theft', 'couple.formed', 'agent.born', 'world.effect', 'village.event', 'party', 'gazette.published']);
+    const e = pick(['trial.verdict', 'mayor.elected', 'crime.theft', 'couple.formed', 'agent.born', 'world.effect', 'village.event', 'party']);
     if (!e) return 'rien ne s’est passé, et c’est déjà beaucoup';
     // Première phrase seulement, coupée proprement à un mot.
     const sentence = e.text.replace(/^[^\p{L}]+/u, '').replace(/[«»"]/g, '').split(/[!.:]/)[0].trim().toLowerCase();
@@ -739,7 +760,7 @@ export class Daily {
       delete o.opinions[id];
       if (o.family?.partnerId === id) delete o.family.partnerId;
     }
-    sim.emit('agent.left', [id], `🧳 ${a.name} quitte le village, chassé·e par le verdict.`, { agentId: id });
+    sim.emit('agent.left', [id], `🧳 ${a.name} quitte le village après le verdict.`, { agentId: id });
     if (w.mayorId === id) {
       const next = Object.values(w.agents)[0];
       if (next) w.mayorId = next.id;

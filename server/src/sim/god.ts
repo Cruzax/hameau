@@ -16,7 +16,7 @@ import type { Sim } from './Sim';
 
 // Pouvoirs du panneau « Dieu ». Tout passe par le journal : chaque intervention est rejouable.
 
-const STYLE_BY_ROLE: Partial<Record<Role, HouseStyle>> = { MENTEUR: 'cabane', CITOYEN: 'chaumiere' };
+const STYLE_BY_ROLE: Partial<Record<Role, HouseStyle>> = { MENTEUR: 'cabane', VOLEUR: 'cabane', CITOYEN: 'chaumiere', BOULANGER: 'boulangerie' };
 const PALETTE: [string, string][] = [
   ['#efd9b8', '#7a6a9e'], ['#e9d3b0', '#4f8a5b'], ['#f0dcc0', '#b5523b'], ['#ead8bd', '#3d6d8f'], ['#c69a6d', '#6b4a8a'],
 ];

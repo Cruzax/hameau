@@ -24,13 +24,21 @@ export class Politics {
     else if (!vote && clock.day % voteEveryDays === 0 && sim.dayTick === Math.round(clock.ticksPerDay * OPEN_AT)) this.open(sim);
   }
 
-  /** Humeur du village envers le maire, chaque soir : la gazette est son bilan. */
+  /** Jour où le maire actuel a pris ses fonctions (pour l'usure du pouvoir). */
+  private mayorSince = 1;
+  private lastProposer: string | null = null;
+
+  /** Humeur du village envers le maire, chaque soir : la gazette est son bilan, et le pouvoir use. */
   onDayEnd(sim: Sim, published: boolean) {
     const mayor = sim.world.mayorId;
+    const tenure = sim.clock.day - this.mayorSince;
+    // Au-delà de six jours, chaque jour de plus agace un peu plus (plafonné).
+    const wear = tenure > 6 ? Math.min(0.05, (tenure - 6) * 0.005) : 0;
     for (const a of Object.values(sim.world.agents)) {
       if (a.id === mayor) continue;
-      if (published) sim.adjustOpinion(a.id, mayor, 0.05);
+      if (published) sim.adjustOpinion(a.id, mayor, 0.035);
       else sim.adjustOpinion(a.id, mayor, -0.15, 'Pas de gazette aujourd’hui, à quoi sert le maire ?');
+      if (wear) sim.adjustOpinion(a.id, mayor, -wear);
       // Les ambitieux grignotent leur estime du maire, jour après jour.
       sim.adjustOpinion(a.id, mayor, -(a.personality.ambition - 0.3) * 0.1);
     }
@@ -40,7 +48,13 @@ export class Politics {
     const w = sim.world;
     const mayor = w.mayorId;
     const others = Object.values(w.agents).filter((a) => a.id !== mayor);
-    const proposer = others.sort((a, b) => (a.opinions[mayor] ?? 0) - (b.opinions[mayor] ?? 0))[0];
+    // Parmi les mécontents, on tire au sort (en évitant le dernier à avoir lancé une motion).
+    const unhappy = others.filter((a) => (a.opinions[mayor] ?? 0) <= MOTION_THRESHOLD);
+    const pool = unhappy.length > 1 ? unhappy.filter((a) => a.id !== this.lastProposer) : unhappy;
+    const proposer = force && !pool.length
+      ? others.sort((a, b) => (a.opinions[mayor] ?? 0) - (b.opinions[mayor] ?? 0))[0]
+      : pool[Math.floor(Math.random() * pool.length)];
+    if (proposer) this.lastProposer = proposer.id;
     if (!proposer || (!force && (proposer.opinions[mayor] ?? 0) > MOTION_THRESHOLD)) {
       sim.emit('vote.opened', [], `🏛 Jour de conseil : personne ne conteste ${sim.agent(mayor).name}.`, { motion: false });
       return;
@@ -116,6 +130,7 @@ export class Politics {
     if (newMayorId) {
       const next = sim.agent(newMayorId);
       w.mayorId = newMayorId;
+      this.mayorSince = w.clock.day;
       if (old.role === 'MAIRE') old.role = 'CITOYEN';
       sim.emit('mayor.elected', [newMayorId, old.id], `👑 ${next.name} devient maire ! ${old.name} perd l’écharpe.`, { voteId: vote.id });
       sim.adjustOpinion(old.id, newMayorId, -0.3, 'Usurpateur !');

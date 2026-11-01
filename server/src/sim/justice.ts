@@ -50,7 +50,7 @@ export class Justice {
     if (!c) return;
     const victim = sim.agent(c.victim);
     if (!victim) return;
-    sim.emit('crime.theft', [c.victim], `🚨 ${victim.name} a été volé·e cette nuit : ${c.loss} !`, { caseId: c.id });
+    sim.emit('crime.theft', [c.victim], `🚨 Vol chez ${victim.name} cette nuit : ${c.loss} !`, { caseId: c.id });
     for (const a of Object.values(sim.world.agents)) a.needs && (a.needs.humeur = Math.max(0, a.needs.humeur - 0.05));
   }
 
@@ -117,14 +117,14 @@ export class Justice {
     const truth = accused.id === c.culprit;
     sim.emit('trial.verdict', [accused.id, garde ?? accused.id],
       condemned
-        ? `⚖️ ${accused.name} est jugé·e coupable (${guilty}/${voters}) et banni·e du village !`
-        : `⚖️ ${accused.name} est acquitté·e (${guilty}/${voters}) et rentre chez soi, la tête haute.`,
+        ? `⚖️ Le village déclare ${accused.name} coupable (${guilty}/${voters}) : bannissement !`
+        : `⚖️ Le village innocente ${accused.name} (${guilty}/${voters}), qui rentre chez soi la tête haute.`,
       { caseId: c.id, condemned, truth });
     if (condemned) {
       if (!truth) for (const a of Object.values(sim.world.agents)) if (a.id === c.culprit) sim.remember(a.id, a.id, 'in', `Ils ont banni ${accused.name} à ma place…`);
       sim.daily.banish(sim, accused.id);
     } else if (garde) {
-      sim.adjustOpinion(accused.id, garde, -0.4, 'On m’a accusé·e à tort');
+      sim.adjustOpinion(accused.id, garde, -0.4, 'Accusation injuste');
     }
   }
 }

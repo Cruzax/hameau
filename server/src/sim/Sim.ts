@@ -345,6 +345,11 @@ export class Sim {
 
   private advanceMessages() {
     for (const msg of Object.values(this.world.messages)) {
+      // L'expéditeur ou le destinataire a quitté le village : la lettre se perd.
+      if ([msg.from, msg.to, msg.origin, msg.finalTo].some((id) => id && !this.agent(id))) {
+        delete this.world.messages[msg.id];
+        continue;
+      }
       const road = this.world.roads[msg.roadId];
       if (!road || road.status === 'cut') {
         delete this.world.messages[msg.id];

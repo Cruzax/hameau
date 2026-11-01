@@ -59,6 +59,16 @@ export const DRAFTS: ((t: string) => string)[] = [
   (t) => `${t}. La suite au prochain numéro.`,
 ];
 
+/** Avis du lecteur par note : des remarques qui conviennent à n'importe quel sujet. */
+export const REVIEW_COMMENTS: Record<number, string[]> = {
+  1: ['Du vent.', 'Je m’en servirai pour allumer le feu.', 'Rien appris, rien senti.'],
+  2: ['Le sujet méritait mieux.', 'Trop court pour en tirer quelque chose.', 'On a déjà oublié.'],
+  3: ['Correct, sans plus.', 'Il manque un détail qui accroche.', 'Ni chaud ni froid.'],
+  4: ['Enfin un sujet qui nous concerne.', 'Ça sent le vécu, j’aime.', 'Bien vu, et bien dit.'],
+  5: ['Je l’ai lu deux fois !', 'Le meilleur numéro de la semaine.', 'Tout le village va en parler.'],
+};
+
+/** Anciennes critiques toutes faites (gardées pour référence). */
 export const REVIEWS: [number, string][] = [
   [4, 'Enfin un sujet qui nous concerne. 4/5.'],
   [2, 'Trop lyrique, on n’y comprend rien. 2/5.'],

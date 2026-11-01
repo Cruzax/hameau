@@ -80,7 +80,7 @@ export const EVENTS: VillageEvent[] = [
       const a = h.someone((x) => !x.asleep) ?? h.someone();
       if (!a) return null;
       h.mood(a, 0.25);
-      const wish = h.pick(['être aimé·e', 'devenir maire', 'ne plus jamais avoir faim', 'que la rivière se calme', 'retrouver un vieil ami']);
+      const wish = h.pick(['trouver l’amour', 'devenir maire', 'ne plus jamais avoir faim', 'que la rivière se calme', 'retrouver un vieil ami']);
       return `🌠 Une étoile filante ! ${a.name} fait le vœu de ${wish}.`;
     },
   },
@@ -211,7 +211,7 @@ export const EVENTS: VillageEvent[] = [
       const bard = Object.values(sim.world.agents).find((a) => a.role === 'BARDE')!;
       const writer = Object.values(sim.world.agents).find((a) => a.role === 'ECRIVAIN')!;
       const [winner, loser] = Math.random() < 0.5 ? [bard, writer] : [writer, bard];
-      sim.adjustOpinion(loser.id, winner.id, -0.15, 'Battu·e au duel de poésie');
+      sim.adjustOpinion(loser.id, winner.id, -0.15, 'Défaite au duel de poésie');
       h.mood(winner, 0.2);
       return `✒️ Duel de poésie à l’auberge entre ${bard.name} et ${writer.name}. ${winner.name} triomphe sous les applaudissements.`;
     },
@@ -230,7 +230,7 @@ export const EVENTS: VillageEvent[] = [
       const author = h.someone((x) => x.id !== sim.world.mayorId);
       if (!author) return null;
       createRumor(sim, author.id, 'tricheur', sim.world.mayorId, false);
-      for (const a of Object.values(sim.world.agents)) if (a.id !== sim.world.mayorId) sim.adjustOpinion(a.id, sim.world.mayorId, -0.04);
+      for (const a of Object.values(sim.world.agents)) if (a.id !== sim.world.mayorId) sim.adjustOpinion(a.id, sim.world.mayorId, -0.08);
       return `✉️ Une lettre anonyme clouée sur la porte de la mairie accuse ${sim.agent(sim.world.mayorId)?.name} de tricher.`;
     },
   },
@@ -251,7 +251,7 @@ export const EVENTS: VillageEvent[] = [
       if (!a) return null;
       const veg = h.pick(['un potiron énorme', 'des carottes biscornues', 'un chou géant', 'des radis tout ronds']);
       h.mood(a, 0.1);
-      return `🥕 ${a.name} récolte ${veg} dans son potager, et en est très fier·e.`;
+      return `🥕 ${a.name} récolte ${veg} dans son potager, et s’en vante à tout le monde.`;
     },
   },
 ];

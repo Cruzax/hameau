@@ -1,7 +1,7 @@
 import { mulberry32, type Agent, type AgentId, type Role, type VoteSession, type WorldState } from '@hameau/shared';
 import type { Decision, VoteDecision } from './decision';
 import type { Trigger } from './prompts';
-import { DRAFTS, REVIEWS, TOPICS } from '../content/gazette';
+import { DRAFTS, REVIEW_COMMENTS, TOPICS } from '../content/gazette';
 import { takeNews } from '../content/news';
 import { neighbors } from '../sim/graph';
 
@@ -28,6 +28,7 @@ export function createScript(seed = Date.now()) {
   let day: { topic?: string; edited?: string; review?: number } = {};
   /** Sujets déjà traités : on ne publie pas deux fois la même nouvelle. */
   const usedTopics = new Set<string>();
+  const recentDrafts: number[] = [];
   const freshNews = () => {
     for (let n = takeNews(); n; n = takeNews()) if (!usedTopics.has(n)) return n;
     return undefined;
@@ -80,7 +81,12 @@ export function createScript(seed = Date.now()) {
         return decision({ thought: pick(SCOUTING), messages: [{ to: writer, kind: 'topic', body: `Sujet : ${day.topic} !` }] });
       }
       if (agent.role === 'ECRIVAIN' && msg.kind === 'topic' && editor) {
-        const draft = pick(DRAFTS)(day.topic ?? msg.body.replace(/^Sujet : |\s*!$/g, ''));
+        // Pas deux fois de suite la même formule de conclusion.
+        const fresh = DRAFTS.filter((_, i) => !recentDrafts.includes(i));
+        const chosen = fresh[Math.floor(rand() * fresh.length)];
+        recentDrafts.push(DRAFTS.indexOf(chosen));
+        if (recentDrafts.length > 6) recentDrafts.shift();
+        const draft = chosen(day.topic ?? msg.body.replace(/^Sujet : |\s*!$/g, ''));
         return decision({ thought: 'Laissez-moi trouver les mots justes…', messages: [{ to: editor, kind: 'draft', body: draft }] });
       }
       if (agent.role === 'EDITEUR' && msg.kind === 'draft') {
@@ -92,8 +98,10 @@ export function createScript(seed = Date.now()) {
         return decision({ messages: [{ to: reader, kind: 'task', body: `Ton avis avant publication ? « ${msg.body} »` }] });
       }
       if (agent.role === 'LECTEUR' && msg.kind === 'task') {
-        const [score, text] = pick(REVIEWS);
+        const score = 1 + Math.floor(rand() * 5);
         day.review = score;
+        const subject = (day.topic ?? '').split(/[:;,]/)[0].trim();
+        const text = `${subject ? `« ${subject} » : ` : ''}${pick(REVIEW_COMMENTS[score])} ${score}/5.`;
         return decision({ messages: [{ to: w.mayorId, kind: 'review', body: text }] });
       }
       if (isMayor && msg.kind === 'review' && day.topic) {
@@ -122,7 +130,7 @@ export function createScript(seed = Date.now()) {
       if (msg.kind === 'campaign') {
         const trust = agent.opinions[from] ?? 0;
         return trust > 0
-          ? decision({ thought: 'Ce n’est pas faux…', opinions: [{ about: w.mayorId, delta: -0.15, reason: 'La campagne m’a convaincu·e' }] })
+          ? decision({ thought: 'Ce n’est pas faux…', opinions: [{ about: w.mayorId, delta: -0.15, reason: 'Cette campagne me parle' }] })
           : decision({ thought: 'Propagande !' });
       }
       if (msg.kind === 'chat') {
