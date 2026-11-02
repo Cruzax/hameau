@@ -1,4 +1,4 @@
-import type { WorkplaceKind } from '@hameau/shared';
+import type { Good, WorkplaceKind } from '@hameau/shared';
 
 // Réglages de l'économie (à ajuster sur un long run : voir test/longrun.test.ts).
 
@@ -44,3 +44,14 @@ export const BREAD_PER_SLOT: Partial<Record<WorkplaceKind, number>> = { boulange
 export const FOUNDING_COST = 20;
 /** Soirs d'affilée sans de quoi payer un salaire avant la faillite. */
 export const BANKRUPT_AFTER_DAYS = 7;
+
+/** Le village remet ses propres caisses à ce niveau chaque soir. */
+export const VILLAGE_TILL_FLOOR = 30;
+/** Un patron renfloue sa caisse jusqu'à ce niveau… */
+export const OWNER_REFILL = 20;
+/** …en gardant au moins ceci en poche. */
+export const OWNER_KEEPS = 10;
+/** Au-delà de ce stock (blé, farine, bois, outils), on ne produit plus. */
+export const STOCK_CAP = 60;
+/** Ce que chaque lieu produit. */
+export const OUTPUT_GOOD: Partial<Record<WorkplaceKind, Good>> = { ferme: 'ble', scierie: 'bois', moulin: 'farine', boulangerie: 'pain', forge: 'outils' };

@@ -60,3 +60,11 @@ test('un affamé sans le sou reçoit un pain à la boulangerie', () => {
   assert.equal(a.inventory.pain, 1);
   assert.ok(sim.journal.events.some((e) => /offre un pain/.test(e.text)));
 });
+
+test('une ferme ne produit plus quand ses greniers débordent', () => {
+  const { sim, w, eco } = chain(['ferme']);
+  w.workplaces['wp-ferme'].stock.ble = 500;
+  eco.morning(sim);
+  eco.evening(sim);
+  assert.equal(w.workplaces['wp-ferme'].stock.ble, 500);
+});

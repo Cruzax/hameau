@@ -36,7 +36,9 @@ test('un sans-emploi est embauché le matin et payé le soir', () => {
 
 test('trois soirs sans paie : le dernier embauché est renvoyé', () => {
   const { sim, w, eco } = setup([{ kind: 'ferme', till: 0 }]);
-  const a = Object.values(w.agents)[0];
+  const [a, boss] = Object.values(w.agents);
+  boss.inventory = { pain: 0, bois: 0, outils: 0, pieces: 0 };
+  w.workplaces['wp-0'].ownerId = boss.id; // un patron fauché : personne pour renflouer
   assert.ok(eco.hire(sim, a.id, 'wp-0'));
   for (let i = 0; i < 3; i++) {
     eco.morning(sim);
@@ -100,4 +102,20 @@ test('le seul employé d’un lieu ne le quitte pas pour mieux payé', () => {
   for (const x of Object.values(w.agents)) if (!x.job) x.job = { workplaceId: 'aucun', since: 0, wage: 0 };
   eco.morning(sim);
   assert.equal(a.job?.workplaceId, 'wp-0');
+});
+
+test('le village renfloue la caisse de ses propres lieux de travail', () => {
+  const { sim, w, eco } = setup([{ kind: 'moulin', till: 0 }]);
+  eco.evening(sim);
+  assert.ok(w.workplaces['wp-0'].till >= 30, `caisse ${w.workplaces['wp-0'].till}`);
+});
+
+test('un patron renfloue son affaire de sa poche, s’il le peut', () => {
+  const { sim, w, eco } = setup([{ kind: 'moulin', till: 0 }]);
+  const boss = Object.values(w.agents)[0];
+  boss.inventory = { pain: 0, bois: 0, outils: 0, pieces: 50 };
+  w.workplaces['wp-0'].ownerId = boss.id;
+  eco.evening(sim);
+  assert.equal(w.workplaces['wp-0'].till, 20);
+  assert.equal(boss.inventory.pieces, 30);
 });

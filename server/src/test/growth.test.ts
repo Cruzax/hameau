@@ -33,6 +33,10 @@ test('la seule boulangerie fait faillite : une autre ouvre aussitôt', () => {
     { kind: 'boulangerie', till: 0 }, { kind: 'ferme', till: 500 }, { kind: 'moulin', till: 500 }, { kind: 'scierie', till: 500 },
   ]);
   const old = Object.values(w.workplaces).find((x) => x.kind === 'boulangerie')!;
+  // Un lieu du village est toujours renfloué : seule une affaire privée sans le sou fait faillite.
+  const broke = Object.values(w.agents)[5];
+  broke.inventory = { pain: 0, bois: 0, outils: 0, pieces: 0 };
+  old.ownerId = broke.id;
   for (let d = 0; d < 9; d++) eco.evening(sim);
   assert.ok(sim.journal.events.some((e) => e.type === 'workplace.closed'));
   assert.equal(w.workplaces[old.id], undefined);

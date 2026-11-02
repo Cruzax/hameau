@@ -4,6 +4,7 @@ import { newWorkplace } from './god';
 import {
   BAKERY_RESERVE, BREAD_PER_FLOUR, BREAD_PER_PURCHASE, BREAD_PER_WOOD, FIRE_AFTER_ABSENCES, FIRE_AFTER_UNPAID_DAYS, GIFTS_PER_DAY,
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
+  OUTPUT_GOOD, OWNER_KEEPS, OWNER_REFILL, STOCK_CAP, VILLAGE_TILL_FLOOR,
   BANKRUPT_AFTER_DAYS, BREAD_NEED_PER_PERSON, BREAD_PER_SLOT, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
 } from './economyConfig';
 
@@ -162,6 +163,27 @@ export class Economy {
     return 0;
   }
 
+  /**
+   * Pour que l'argent ne reste pas coincé dans les poches : le village renfloue ses propres lieux,
+   * et un patron renfloue le sien de sa poche (une mauvaise affaire l'appauvrit).
+   */
+  refinance(sim: Sim) {
+    const w = sim.world;
+    for (const wp of Object.values(w.workplaces)) {
+      const owner = wp.ownerId ? w.agents[wp.ownerId] : undefined;
+      if (!owner) {
+        if (wp.till < VILLAGE_TILL_FLOOR) wp.till = VILLAGE_TILL_FLOOR;
+        continue;
+      }
+      const purse = invOf(owner);
+      const put = Math.min(OWNER_REFILL - wp.till, purse.pieces - OWNER_KEEPS);
+      if (put > 0) {
+        purse.pieces -= put;
+        wp.till += put;
+      }
+    }
+  }
+
   /** Les lieux de travail se fournissent les uns chez les autres, de caisse à caisse. */
   trade(sim: Sim) {
     const w = sim.world;
@@ -188,6 +210,10 @@ export class Economy {
       const n = wp.workers.filter((id) => this.present.has(id)).length;
       if (!n) continue;
       const st = wp.stock;
+      // Greniers pleins : on ne produit plus (le pain, lui, se garde selon la taille du village).
+      const cap = wp.kind === 'boulangerie' ? Math.max(24, Object.keys(w.agents).length * 3) : STOCK_CAP;
+      const output = OUTPUT_GOOD[wp.kind];
+      if (output && (st[output] ?? 0) >= cap) continue;
       const add = (g: Good, q: number) => (st[g] = (st[g] ?? 0) + q);
       switch (wp.kind) {
         case 'ferme': add('ble', OUTPUT_PER_WORKER.ble * n); break;
@@ -220,6 +246,7 @@ export class Economy {
   /** Le soir : commerce, production, puis paie ; caisse vide trop longtemps = renvoi ; surplus au patron. */
   evening(sim: Sim) {
     const w = sim.world;
+    this.refinance(sim);
     this.trade(sim);
     this.produce(sim);
     this.paidToday.clear();
