@@ -224,7 +224,7 @@ const FOUNDER_STYLES: House['style'][] = ['chaumiere', 'atelier', 'chaumiere', '
 const FOUNDER_COLORS: [string, string][] = [['#f3e3c3', '#c0573e'], ['#e8d2a8', '#3f7a6b'], ['#f1d9b5', '#8a5a9e'], ['#efe0c8', '#2f5d8a']];
 
 
-/** Monde de départ d'une histoire choisie : 4 maisons, une ferme et une boulangerie du village, la place et les ponts. */
+/** Monde de départ d'une histoire choisie : 4 maisons, la chaîne du pain tenue par le village, la place et les ponts. */
 export function createFounderWorld(founders: FounderSpec[], rand: () => number = Math.random): WorldState {
   const roles = autoRoles(founders);
   const ids = founders.map((f, i) => f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `habitant-${i}`);
@@ -244,16 +244,20 @@ export function createFounderWorld(founders: FounderSpec[], rand: () => number =
     ({ id, ownerId: null, kind: 'travail', position, rotation: facing(position, PLAZA), style, wallColor: '#ecdcbc', roofColor: '#8a4a2a' });
   const bakery = work('w-boulangerie', 'boulangerie', { x: -17, z: -1 });
   const farm = work('w-ferme', 'ferme', { x: -22, z: -16 });
+  const mill = work('w-moulin', 'moulin', { x: 2, z: 20 });
+  const sawmill = work('w-scierie', 'scierie', { x: -20, z: 13 });
   const workplaces: WorldState['workplaces'] = {
-    'wp-boulangerie': { id: 'wp-boulangerie', kind: 'boulangerie', era: 'ancienne', houseId: bakery.id, ownerId: null, slots: 2, workers: [], till: 40, stock: { pain: 12 }, unpaidDays: 0, openedDay: 1 },
-    'wp-ferme': { id: 'wp-ferme', kind: 'ferme', era: 'ancienne', houseId: farm.id, ownerId: null, slots: 4, workers: [], till: 40, stock: {}, unpaidDays: 0, openedDay: 1 },
+    'wp-boulangerie': { id: 'wp-boulangerie', kind: 'boulangerie', era: 'ancienne', houseId: bakery.id, ownerId: null, slots: 2, workers: [], till: 40, stock: { pain: 24 }, unpaidDays: 0, openedDay: 1 },
+    'wp-ferme': { id: 'wp-ferme', kind: 'ferme', era: 'ancienne', houseId: farm.id, ownerId: null, slots: 4, workers: [], till: 40, stock: { ble: 12 }, unpaidDays: 0, openedDay: 1 },
+    'wp-moulin': { id: 'wp-moulin', kind: 'moulin', era: 'ancienne', houseId: mill.id, ownerId: null, slots: 2, workers: [], till: 40, stock: { farine: 8 }, unpaidDays: 0, openedDay: 1 },
+    'wp-scierie': { id: 'wp-scierie', kind: 'scierie', era: 'ancienne', houseId: sawmill.id, ownerId: null, slots: 3, workers: [], till: 40, stock: { bois: 8 }, unpaidDays: 0, openedDay: 1 },
   };
   const ai = founders.findIndex((f) => f.ai);
   return {
     ...createSeedWorld('origine'),
     mayorId: ids[roles.indexOf('MAIRE')] ?? ids[0],
     agents: byId(agents),
-    houses: byId([...houses, bakery, farm, ...structuredClone(NETWORK_NODES)]),
+    houses: byId([...houses, bakery, farm, mill, sawmill, ...structuredClone(NETWORK_NODES)]),
     roads: byId(structuredClone(NETWORK_ROADS)),
     workplaces,
     ...(ai >= 0 ? { aiAgentId: ids[ai] } : {}),

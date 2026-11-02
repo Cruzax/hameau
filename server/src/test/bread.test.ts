@@ -68,3 +68,14 @@ test('une ferme ne produit plus quand ses greniers débordent', () => {
   eco.evening(sim);
   assert.equal(w.workplaces['wp-ferme'].stock.ble, 500);
 });
+
+test('un enfant sans emploi mange aussi grâce au potager', () => {
+  const { sim, w, eco, agents } = chain([]);
+  const kid = agents[0];
+  kid.family = { parentIds: [agents[1].id], childIds: [] };
+  kid.houseId = agents[1].houseId; // vit chez son parent : c'est un enfant
+  kid.inventory = { pain: 0, bois: 0, outils: 0, pieces: 0 };
+  eco.morning(sim);
+  assert.equal(kid.inventory.pain, SUBSISTENCE_BREAD);
+  assert.ok(w);
+});

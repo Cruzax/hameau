@@ -107,8 +107,8 @@ export class Economy {
       const canLeave = current && current.workers.length > 1;
       if (!current || (canLeave && WAGES[best.kind] >= WAGES[current.kind] + SWITCH_IF_BETTER_BY)) this.hire(sim, a.id, best.id);
     }
-    // Le potager : un pain par jour pour qui n'a pas d'emploi.
-    for (const a of Object.values(w.agents)) if (isAdult(w, a) && !a.job) invOf(a).pain += SUBSISTENCE_BREAD;
+    // Le potager : un pain par jour pour qui n'a pas d'emploi (enfants compris).
+    for (const a of Object.values(w.agents)) if (!a.job) invOf(a).pain += SUBSISTENCE_BREAD;
     this.gifts.clear();
     this.present.clear();
     for (const wp of Object.values(w.workplaces)) {

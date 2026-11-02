@@ -38,6 +38,18 @@ const RETRY_TICKS = 60;           // après un achat raté, on attend avant de r
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+/**
+ * Envie de voler cette nuit (probabilité par décision nocturne) : le vagabond par habitude, l'affamé sans le sou
+ * s'il est peu honnête, et le pauvre malhonnête par envie des plus riches.
+ */
+export function theftUrge(a: Agent, s: { satiete: number; pain: number; pieces: number }): number {
+  if (a.role === 'VOLEUR') return s.satiete < 0.6 ? 0.5 : 0.2;
+  const honesty = a.personality.honesty;
+  if (honesty < 0.55 && s.satiete < 0.3 && s.pain === 0 && s.pieces < PRICES.pain) return 0.35;
+  if (honesty < 0.4 && s.pieces < 3) return 0.06;
+  return 0;
+}
+
 export class Daily {
   readonly justice = new Justice();
   private lastNeedsPatch = 0;
@@ -277,8 +289,7 @@ export class Daily {
     // La nuit, on rentre et on dort… sauf le vagabond, qui a d'autres projets.
     if (night) {
       // Le vagabond vole par habitude ; un habitant peu honnête et affamé, sans pain ni sou, peut craquer.
-      const desperate = a.personality.honesty < 0.55 && n.satiete < 0.3 && inv.pain === 0 && inv.pieces < PRICES.pain;
-      const urge = a.role === 'VOLEUR' ? (n.satiete < 0.6 ? 0.5 : 0.2) : desperate ? 0.35 : 0;
+      const urge = theftUrge(a, { satiete: n.satiete, pain: inv.pain, pieces: inv.pieces });
       if (urge && home && hour >= 1 && hour < 3 && Math.random() < urge) {
         const target = this.richestHouse(sim, a);
         if (target && this.trip(sim, a, target, 'vol', 0.3)) return;

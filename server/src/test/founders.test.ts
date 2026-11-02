@@ -40,11 +40,11 @@ test('des traits incompatibles sont refusés, avec un message en français', () 
   assert.ok(validateFounders(FOUNDERS.map((f) => ({ ...f, ai: true }))), 'deux agents IA refusés');
 });
 
-test('le monde des fondateurs : 4 habitants, une ferme, une boulangerie, des routes propres', () => {
+test('le monde des fondateurs : 4 habitants, toute la chaîne du pain, des routes propres', () => {
   const w = createFounderWorld(FOUNDERS);
   assert.equal(Object.keys(w.agents).length, 4);
   const kinds = Object.values(w.workplaces).map((x) => x.kind).sort();
-  assert.deepEqual(kinds, ['boulangerie', 'ferme']);
+  assert.deepEqual(kinds, ['boulangerie', 'ferme', 'moulin', 'scierie']);
   for (const a of Object.values(w.agents)) {
     assert.ok(a.sex === 'M' || a.sex === 'F');
     assert.ok(['hetero', 'bi', 'gay'].includes(a.orientation!));

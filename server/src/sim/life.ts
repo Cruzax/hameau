@@ -14,7 +14,7 @@ const SPLIT_OPINION = 0.05;       // en dessous, le couple se sépare
 const BIRTH_AFTER_DAYS = 4;       // ancienneté du couple avant un premier enfant
 const BIRTH_CHANCE = 0.15;
 const ADULT_AFTER_DAYS = 7;       // un enfant construit sa maison au bout de ces jours
-const NEWCOMER_CHANCE = 0.15;
+const NEWCOMER_CHANCE = 0.3;
 const LEAVE_CHANCE = 0.3;
 
 const NAMES = ['Léa', 'Hugo', 'Jade', 'Nathan', 'Chloé', 'Lucas', 'Emma', 'Tom', 'Zoé', 'Noah', 'Sacha', 'Lina', 'Gabin', 'Rose', 'Malo', 'Nina', 'Théo', 'Alba'];
