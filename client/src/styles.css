@@ -774,3 +774,101 @@ button.brain__opt { cursor: pointer; }
 .sheet__gauge-bar { height: 7px; border-radius: 4px; background: rgba(59, 42, 30, 0.12); overflow: hidden; }
 .sheet__gauge-bar > span { display: block; height: 100%; border-radius: 4px; transition: width 0.4s; }
 .sheet__gauge-pct { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+
+/* ═══ Coup de frais : fenêtres en verre dépoli, une couleur par fenêtre ═══════════════ */
+:root {
+  --panel-bg: rgba(255, 251, 244, 0.86);
+  --panel-line: rgba(70, 50, 30, 0.12);
+  --panel-shadow: 0 18px 40px -18px rgba(40, 28, 16, 0.45), 0 2px 6px rgba(40, 28, 16, 0.08);
+  --accent: #6b5442;
+}
+.panel[data-panel='journal'] { --accent: #3d6f8e; }
+.panel[data-panel='gazette'] { --accent: #b5483a; }
+.panel[data-panel='habitants'] { --accent: #4f8a5b; }
+.panel[data-panel='relations'] { --accent: #c0607f; }
+.panel[data-panel='dieu'] { --accent: #c48a1c; }
+.panel[data-panel='maison'] { --accent: #7a5c9e; }
+
+.panel {
+  border-radius: 16px;
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+}
+/* Le filet de couleur, en haut de chaque fenêtre. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0.85;
+}
+.panel__head {
+  gap: 8px;
+  padding: 9px 8px 8px 10px;
+  background: none;
+  border-bottom: 1px solid var(--panel-line);
+}
+.panel__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-size: 13px;
+}
+.panel__title { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.panel__btn { border-radius: 50%; }
+.panel__btn:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.panel__body { padding: 10px 12px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 35%, transparent) transparent; }
+.panel__body::-webkit-scrollbar { width: 6px; }
+.panel__body::-webkit-scrollbar-thumb { border-radius: 3px; background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.panel__resize { opacity: 0.5; }
+.panel__resize:hover { opacity: 1; }
+
+/* Habitants : des lignes légères au lieu de cartes. */
+.people { gap: 0; }
+.person { border-radius: 10px; background: transparent; padding: 7px 8px; }
+.person + .person, li + li > .person { border-top: 1px solid var(--panel-line); }
+.person:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: transparent; }
+.person__name { font-size: 13px; }
+
+/* Journal : un fil discret, la couleur du fil suit l'auteur ou le type. */
+.journal__item {
+  margin-bottom: 2px;
+  padding: 6px 9px;
+  border-left-width: 2px;
+  background: transparent;
+  border-radius: 0 8px 8px 0;
+}
+.journal__item:hover { background: rgba(255, 255, 255, 0.55); }
+.journal__item--day, .journal__item--gazette, .journal__item--road { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.journal__export { border-radius: 999px; background: var(--accent); }
+
+/* Petits intitulés en casse normale, plus en capitales espacées. */
+.god__section h3, .gazette__kicker, .journal__gazette-kicker, .start__kicker, .start__label, .vote__kicker {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.god__section { border-bottom-color: var(--panel-line); }
+.god button, .chip {
+  border-color: var(--panel-line);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+}
+.god button:hover, .chip:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.god__primary { background: var(--accent) !important; border-color: var(--accent) !important; }
+
+/* Gazette : une une de journal sur papier, le reste en verre. */
+.gazette { background: rgba(255, 252, 240, 0.9); border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-radius: 12px; }
+.gazette__title { font-size: 17px; }
+
+/* Relations : grille plus aérée, coins arrondis. */
+.opinions { border-spacing: 3px; }
+.opinions td { border-radius: 6px; }
+.opinions th { font-weight: 700; }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WORKPLACE_LABEL } from '../scene/House';
 import { ROLE_LABEL, type Role } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { Panel } from './Panel';
@@ -38,9 +39,18 @@ export function GodPanel() {
   const [about, setAbout] = useState('');
 
   const agents = Object.values(world.agents);
-  const houses = Object.values(world.houses);
+  // Les listes de maisons ne proposent que les vraies maisons (pas les carrefours ni les lieux de travail).
+  const houses = Object.values(world.houses).filter((h) => (h.kind ?? 'maison') === 'maison');
   const houseLabel = (id: string) => {
-    const owner = world.houses[id]?.ownerId;
+    const h = world.houses[id];
+    if (id.startsWith('place-')) return 'la place';
+    if (id.startsWith('pont-')) return 'le pont';
+    if (h?.kind === 'carrefour') return 'un carrefour';
+    if (h?.kind === 'travail') {
+      const wp = Object.values(world.workplaces ?? {}).find((x) => x.houseId === id);
+      return wp ? WORKPLACE_LABEL[wp.kind] ?? wp.kind : 'un atelier vide';
+    }
+    const owner = h?.ownerId;
     return owner && world.agents[owner] ? world.agents[owner].name : 'maison vide';
   };
   const voteOpen = world.votes.some((v) => v.status === 'open');

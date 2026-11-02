@@ -51,6 +51,7 @@ export function Panel({ id, title, icon, actions, minW = 220, minH = 110, childr
   return (
     <section
       className={`panel ${p.collapsed ? 'panel--collapsed' : ''}`}
+      data-panel={id}
       style={{ left: p.x, top: p.y, width: p.w, height: p.collapsed ? undefined : p.h, zIndex: 20 + p.z }}
       onPointerDown={() => focus(id)}
     >
