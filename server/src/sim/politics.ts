@@ -123,11 +123,19 @@ export class Politics {
     vote.status = 'closed';
 
     const old = sim.agent(vote.targetMayorId);
+    // Le maire visé a quitté le village (banni) pendant le vote : il n'y a plus rien à trancher.
+    if (!old) {
+      vote.result = { destituted: false, tally };
+      sim.emit('vote.closed', [], '🗳️ Le maire visé a quitté le village : le vote est annulé.', { voteId: vote.id, tally, cancelled: true });
+      sim.touchAgents();
+      return;
+    }
     // Majorité absolue du village : un bulletin perdu en route compte comme un soutien au maire.
     const destituted = yes.length > n / 2;
     let newMayorId: AgentId | undefined;
     if (destituted) {
       const ranked = vote.candidates
+        .filter((id) => w.agents[id]) // un candidat parti pendant le vote ne compte plus
         .map((id) => ({ id, votes: tally[id] ?? 0, esteem: this.esteem(sim, id) }))
         .sort((a, b) => b.votes - a.votes || b.esteem - a.esteem);
       newMayorId = ranked[0]?.id;
