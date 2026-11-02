@@ -83,30 +83,25 @@ export const SEED_HOUSES: House[] = [
   house('h-voleur', 'voleur', { x: 24, z: 6 }, 'cabane', '#a88a66', '#6b6b5a'),
 ];
 
-/** Graphe initial volontairement incomplet : le lecteur n'est relié qu'au maire (par le pont). */
-export const SEED_ROADS: Road[] = [
-  { id: 'r-maire-eclaireur', a: 'h-maire', b: 'h-eclaireur', waypoints: [{ x: -7, z: -8 }], status: 'open' },
-  { id: 'r-maire-ecrivain', a: 'h-maire', b: 'h-ecrivain', waypoints: [{ x: 0, z: -4 }, { x: -3, z: 3 }], status: 'open' },
-  { id: 'r-maire-editeur', a: 'h-maire', b: 'h-editeur', waypoints: [{ x: 0, z: -4 }, { x: 3, z: 3 }], status: 'open' },
-  { id: 'r-maire-lecteur', a: 'h-maire', b: 'h-lecteur', waypoints: [{ x: 12, z: -5.5 }], status: 'open' },
-  { id: 'r-eclaireur-ecrivain', a: 'h-eclaireur', b: 'h-ecrivain', waypoints: [{ x: -12, z: 4 }], status: 'open' },
-  { id: 'r-ecrivain-editeur', a: 'h-ecrivain', b: 'h-editeur', waypoints: [{ x: -1.2, z: 10.8 }], status: 'open' },
-  // Les nouveaux métiers
-  { id: 'r-maire-boulanger', a: 'h-maire', b: 'h-boulanger', waypoints: [{ x: -3.5, z: -8.5 }], status: 'open' },
-  { id: 'r-boulanger-crieur', a: 'h-boulanger', b: 'h-crieur', waypoints: [], status: 'open' },
-  { id: 'r-crieur-eclaireur', a: 'h-crieur', b: 'h-eclaireur', waypoints: [], status: 'open' },
-  { id: 'r-crieur-barde', a: 'h-crieur', b: 'h-barde', waypoints: [], status: 'open' },
-  { id: 'r-barde-forgeron', a: 'h-barde', b: 'h-forgeron', waypoints: [], status: 'open' },
-  { id: 'r-forgeron-eclaireur', a: 'h-forgeron', b: 'h-eclaireur', waypoints: [], status: 'open' },
-  { id: 'r-forgeron-ecrivain', a: 'h-forgeron', b: 'h-ecrivain', waypoints: [], status: 'open' },
-  { id: 'r-ecrivain-aubergiste', a: 'h-ecrivain', b: 'h-aubergiste', waypoints: [], status: 'open' },
-  { id: 'r-editeur-aubergiste', a: 'h-editeur', b: 'h-aubergiste', waypoints: [], status: 'open' },
-  { id: 'r-maire-garde', a: 'h-maire', b: 'h-garde', waypoints: [{ x: 3.5, z: -8.5 }], status: 'open' },
-  { id: 'r-garde-boulanger', a: 'h-garde', b: 'h-boulanger', waypoints: [], status: 'open' },
-  { id: 'r-editeur-herboriste', a: 'h-editeur', b: 'h-herboriste', waypoints: [], status: 'open' },
-  { id: 'r-herboriste-lecteur', a: 'h-herboriste', b: 'h-lecteur', waypoints: [], status: 'open' },
-  { id: 'r-lecteur-voleur', a: 'h-lecteur', b: 'h-voleur', waypoints: [], status: 'open' },
-  { id: 'r-voleur-herboriste', a: 'h-voleur', b: 'h-herboriste', waypoints: [], status: 'open' },
+/** Carrefours fixes : le pourtour de la place (cœur du réseau) et les deux ponts, une tête sur chaque rive. */
+function node(id: string, position: Vec2): House {
+  return { id, ownerId: null, kind: 'carrefour', position, rotation: 0, style: 'carrefour', wallColor: '#000', roofColor: '#000' };
+}
+export const NETWORK_NODES: House[] = [
+  node('place-n', { x: 0, z: -4.3 }),
+  node('place-e', { x: 4.3, z: 0 }),
+  node('place-s', { x: 0, z: 4.3 }),
+  node('place-o', { x: -4.3, z: 0 }),
+  node('pont-sud-o', { x: 4.4, z: -14 }),
+  node('pont-sud-e', { x: 13.2, z: -14 }),
+  node('pont-nord-o', { x: 5.7, z: 28 }),
+  node('pont-nord-e', { x: 14.5, z: 28 }),
+];
+const way = (a: string, b: string): Road => ({ id: `r-${a}-${b}`, a, b, waypoints: [], status: 'open' });
+/** Le tour de la place et les deux ponts. Le reste du réseau se construit au fil des maisons (serveur). */
+export const NETWORK_ROADS: Road[] = [
+  way('place-n', 'place-e'), way('place-e', 'place-s'), way('place-s', 'place-o'), way('place-o', 'place-n'),
+  way('pont-sud-o', 'pont-sud-e'), way('pont-nord-o', 'pont-nord-e'),
 ];
 
 /** Ce que chacun possède au départ ; les métiers commencent avec leur stock. */
@@ -196,9 +191,8 @@ export function createSeedWorld(preset: VillagePreset = 'complet'): WorldState {
     copy.opinions = Object.fromEntries(Object.entries(copy.opinions).filter(([id]) => keep(id)));
     return copy;
   });
-  const houses = SEED_HOUSES.filter((h) => !h.ownerId || keep(h.ownerId));
-  const ids = new Set(houses.map((h) => h.id));
-  const roads = SEED_ROADS.filter((r) => ids.has(r.a) && ids.has(r.b));
+  const houses = [...SEED_HOUSES.filter((h) => !h.ownerId || keep(h.ownerId)), ...NETWORK_NODES];
+  const roads = NETWORK_ROADS;
   return {
     clock: { tick: 0, day: 1, ticksPerDay: 480, tickMs: 625, speed: 1, paused: false },
     terrain: TERRAIN,

@@ -1,6 +1,6 @@
 import type { Agent, AgentId } from '@hameau/shared';
 import type { Brain, Sim } from '../sim/Sim';
-import { neighbors } from '../sim/graph';
+import { neighbors } from '../sim/network';
 import type { LLMProvider, LLMRequest } from '../llm/LLMProvider';
 import { DecisionSchema, SummarySchema, VoteSchema, toActions, voteActions } from './decision';
 import { situationPrompt, summaryPrompt, systemPrompt, votePrompt, type Trigger } from './prompts';

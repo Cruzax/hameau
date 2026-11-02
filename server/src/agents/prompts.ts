@@ -1,5 +1,5 @@
 import { formatHour, isNight, villageHour, ROLE_LABEL, type Agent, type Message, type Role, type VoteSession, type WorldState } from '@hameau/shared';
-import { neighbors } from '../sim/graph';
+import { neighbors } from '../sim/network';
 import { peekNews } from '../content/news';
 
 const DUTIES: Record<Role, string> = {

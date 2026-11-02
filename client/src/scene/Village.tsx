@@ -86,7 +86,8 @@ export function Village() {
   const mayorId = useHameau((s) => s.world.mayorId);
   const send = useHameau((s) => s.send);
   const roads = useMemo(() => Object.values(roadsById), [roadsById]);
-  const houses = Object.values(housesById);
+  // Les carrefours ne se dessinent pas : la route suffit.
+  const houses = Object.values(housesById).filter((h) => h.kind !== 'carrefour');
 
   return (
     <>

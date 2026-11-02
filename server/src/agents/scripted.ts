@@ -6,7 +6,7 @@ import {
   REVIEW_WRITER, TOPICS, themeOf, type Theme,
 } from '../content/gazette';
 import { takeNews } from '../content/news';
-import { neighbors } from '../sim/graph';
+import { neighbors } from '../sim/network';
 
 // Réponses scriptées du mode mock : zéro appel LLM, comportement crédible pour tester la simulation.
 

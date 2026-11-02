@@ -13,7 +13,7 @@ export function messengerPose(world: WorldState, msg: Message, tickAt: number) {
   const road = world.roads[msg.roadId];
   const from = world.agents[msg.from];
   if (!road || !from) return null;
-  const path = orientedRoadPath(road, world.houses, from.houseId);
+  const path = orientedRoadPath(road, world.houses, msg.legFrom);
   const c = world.clock;
   const elapsedTicks = c.paused ? 0 : (performance.now() - tickAt) / (c.tickMs / c.speed);
   const t = Math.min(1, msg.progress + (msg.speed / polylineLength(path)) * Math.min(elapsedTicks, 1.5));

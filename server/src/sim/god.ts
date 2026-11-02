@@ -13,6 +13,7 @@ import {
   type Vec2,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
+import { connectNode } from './network';
 
 // Pouvoirs du panneau « Dieu ». Tout passe par le journal : chaque intervention est rejouable.
 
@@ -140,7 +141,7 @@ export function addAgent(sim: Sim, c: Extract<ClientToServer, { type: 'god.agent
   w.agents[id] = agent;
   sim.emit('agent.added', [id], `🏡 ${name} s’installe au village, près de chez ${houseName(sim, near.id)}.`, { agentId: id, role, agent, house });
   sim.broadcastPatch({ houses: w.houses, agents: w.agents });
-  buildRoad(sim, house.id, near.id);
+  connectNode(sim, house.id);
 }
 
 /** Exil : l'habitant part, sa maison reste vide. Si c'était le maire, le plus estimé reprend l'écharpe. */
@@ -151,7 +152,7 @@ export function exileAgent(sim: Sim, id: AgentId) {
   delete w.agents[id];
   const house = w.houses[a.houseId];
   if (house) house.ownerId = null;
-  for (const m of Object.values(w.messages)) if (m.from === id || m.to === id || m.finalTo === id) delete w.messages[m.id];
+  for (const m of Object.values(w.messages)) if (m.from === id || m.to === id) delete w.messages[m.id];
   for (const other of Object.values(w.agents)) delete other.opinions[id];
   sim.emit('agent.left', [id], `🧳 ${a.name} quitte le village. Sa maison reste vide.`, { agentId: id });
   if (w.mayorId === id) {

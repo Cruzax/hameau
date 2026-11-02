@@ -51,9 +51,11 @@ function apply(w: WorldState, e: SimEvent) {
     case 'message.sent': {
       const id = p.messageId as string;
       const from = e.actors[0];
-      if (!p.roadId || !w.roads[p.roadId as string]) return;
+      const route = (p.route as string[] | undefined) ?? (p.roadId ? [p.roadId as string] : []);
+      if (!route.length || route.some((r) => !w.roads[r]) || !w.agents[from]) return;
       const msg: Message = {
-        id, from, to: p.hop as string, roadId: p.roadId as string, kind: p.kind as MessageKind, body: String(p.body ?? ''),
+        id, from, to: e.actors[1], route, leg: 0, roadId: route[0], legFrom: w.agents[from].houseId,
+        kind: p.kind as MessageKind, body: String(p.body ?? ''),
         createdTick: e.tick, progress: 0, speed: Number(p.speed ?? 0.5), status: 'walking',
       };
       w.messages = { ...w.messages, [id]: msg };
@@ -127,10 +129,22 @@ function step() {
   // Avancement des messagers d'après le temps écoulé depuis leur départ.
   const msgs: Record<string, Message> = {};
   for (const m of Object.values(w.messages)) {
-    const road = w.roads[m.roadId];
-    if (!road) continue;
-    const len = Math.max(1, roadLengthOf(w, road));
-    msgs[m.id] = { ...m, progress: Math.min(1, ((rp.tick - m.createdTick) * m.speed) / len) };
+    // Distance parcourue depuis le départ, répartie sur les étapes de l'itinéraire.
+    let left = (rp.tick - m.createdTick) * m.speed;
+    let legFrom = w.agents[m.from]?.houseId ?? m.legFrom;
+    let placed: Message | null = null;
+    for (let leg = 0; leg < m.route.length; leg++) {
+      const road = w.roads[m.route[leg]];
+      if (!road) break;
+      const len = Math.max(1, roadLengthOf(w, road));
+      if (left <= len || leg === m.route.length - 1) {
+        placed = { ...m, leg, roadId: road.id, legFrom, progress: Math.min(1, left / len) };
+        break;
+      }
+      left -= len;
+      legFrom = road.a === legFrom ? road.b : road.a;
+    }
+    if (placed) msgs[m.id] = placed;
   }
   w.messages = msgs;
   w.clock = { ...w.clock, tick: Math.floor(rp.tick), day: due.length ? due[due.length - 1].day : w.clock.day, speed: rp.speed, paused: false };

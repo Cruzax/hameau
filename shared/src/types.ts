@@ -191,17 +191,22 @@ export interface Message {
   id: MessageId;
   from: AgentId;
   to: AgentId;
-  roadId: RoadId;        // un message ne voyage que sur UNE route : entre voisins directs
-  /** Destinataire final si `to` n'est qu'un relais (pas de route directe). */
-  finalTo?: AgentId;
-  /** Auteur d'origine d'un message relayé. */
+  /** Itinéraire complet, route par route, de la maison de l'expéditeur à celle du destinataire. */
+  route: RoadId[];
+  /** Étape en cours dans `route`. */
+  leg: number;
+  /** Route de l'étape en cours (= route[leg]). */
+  roadId: RoadId;
+  /** Nœud d'où part l'étape en cours : donne le sens de marche. */
+  legFrom: HouseId;
+  /** Auteur d'origine (ancien relais ; plus utilisé). */
   origin?: AgentId;
   kind: MessageKind;
   body: string;
   ballot?: Ballot;       // présent si kind === 'ballot'
   replyTo?: MessageId;
   createdTick: number;
-  /** Avancement 0..1 le long de la route, dans le sens from → to. */
+  /** Avancement 0..1 sur l’étape en cours, depuis `legFrom`. */
   progress: number;
   /** Unités de monde par tick. */
   speed: number;

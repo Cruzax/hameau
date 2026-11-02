@@ -16,13 +16,12 @@ import {
   type WorldState,
 } from '@hameau/shared';
 import { Journal } from '../store/journal';
-import { nextHop, roadBetween } from './graph';
+import { buildNetwork, neighbors, route } from './network';
 import { Politics } from './politics';
 import { Life } from './life';
 import { Daily } from './daily';
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
-import { neighbors } from './graph';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
 
 /** Unités de monde parcourues par un messager à chaque tick. */
@@ -68,7 +67,7 @@ const NEWSWORTHY = new Set<SimEvent['type']>([
 /** Variation d'opinion à partir de laquelle on l'inscrit au journal. */
 const NOTABLE_OPINION = 0.15;
 
-interface Pending { due: number; agentId: AgentId; actions: Action[]; relay?: Message; deliverSelf?: Message }
+interface Pending { due: number; agentId: AgentId; actions: Action[]; deliverSelf?: Message }
 
 export class Sim {
   readonly world: WorldState = createSeedWorld();
@@ -89,7 +88,10 @@ export class Sim {
     readonly brain: Brain,
     readonly journal: Journal,
     private readonly broadcast: (msg: ServerToClient) => void,
-  ) {}
+  ) {
+    // Le monde de départ n'a que la place et les ponts : on y raccorde les maisons, sans bruit.
+    buildNetwork(this, { silent: true });
+  }
 
   get clock() {
     return this.world.clock;
@@ -221,7 +223,6 @@ export class Sim {
     for (const p of due) this.pending.splice(this.pending.indexOf(p), 1);
     for (const p of due) {
       if (!this.agent(p.agentId)) continue;
-      if (p.relay) this.relay(p.agentId, p.relay);
       if (p.deliverSelf) this.receive(p.deliverSelf);
       for (const a of p.actions) this.apply(p.agentId, a);
       if (!this.pending.some((q) => q.agentId === p.agentId)) this.setActivity(p.agentId, 'idle');
@@ -299,28 +300,28 @@ export class Sim {
   }
 
   /**
-   * Envoie un message vers `finalTo`. S'il n'y a pas de route directe, le messager part
-   * vers le premier voisin du plus court chemin, qui relaiera. Sans chemin : message perdu.
+   * Envoie un message à `to` : le messager suit le plus court itinéraire par les routes, pont compris,
+   * jusqu'à la porte du destinataire. Sans itinéraire : message perdu.
    */
-  send(from: AgentId, finalTo: AgentId, kind: MessageKind, body: string, opts: { origin?: AgentId; replyTo?: string; ballot?: Ballot } = {}) {
+  send(from: AgentId, to: AgentId, kind: MessageKind, body: string, opts: { replyTo?: string; ballot?: Ballot } = {}) {
     const sender = this.agent(from);
-    const target = this.agent(finalTo);
+    const target = this.agent(to);
     if (!sender || !target) return null;
     // Même toit (soi-même, ou parent et enfant) : pas besoin de messager.
-    if (from === finalTo || sender.houseId === target.houseId) return this.sendInHouse(from, finalTo, kind, body, opts.ballot);
-    const hop = roadBetween(this.world, from, finalTo) ? finalTo : nextHop(this.world, from, finalTo);
-    if (!hop) {
-      this.emit('message.lost', [from, finalTo], `🚫 ${sender.name} ne peut pas joindre ${target.name} : aucune route.`, { kind, body });
+    if (from === to || sender.houseId === target.houseId) return this.sendInHouse(from, to, kind, body, opts.ballot);
+    const path = route(this.world, sender.houseId, target.houseId);
+    if (!path || !path.roads.length) {
+      this.emit('message.lost', [from, to], `🚫 ${sender.name} ne peut pas joindre ${target.name} : aucune route.`, { kind, body });
       return null;
     }
-    const road = roadBetween(this.world, from, hop)!;
     const msg: Message = {
       id: `m${this.nextMsgId++}`,
       from,
-      to: hop,
-      roadId: road.id,
-      finalTo: hop === finalTo ? undefined : finalTo,
-      origin: opts.origin,
+      to,
+      route: path.roads,
+      leg: 0,
+      roadId: path.roads[0],
+      legFrom: sender.houseId,
       kind,
       body,
       replyTo: opts.replyTo,
@@ -331,27 +332,16 @@ export class Sim {
       status: 'walking',
     };
     this.world.messages[msg.id] = msg;
-    const via = hop === finalTo ? '' : ` (via ${this.agent(hop).name})`;
-    this.emit('message.sent', [from, finalTo], `${sender.name} → ${target.name}${via} : « ${body} »`, {
-      messageId: msg.id, kind, body, hop, roadId: road.id, speed: WALK_SPEED, finalTo,
+    this.emit('message.sent', [from, to], `${sender.name} → ${target.name} : « ${body} »`, {
+      messageId: msg.id, kind, body, route: msg.route, roadId: msg.roadId, speed: msg.speed,
     });
     return msg;
-  }
-
-  private relay(by: AgentId, msg: Message) {
-    const finalTo = msg.finalTo!;
-    const origin = msg.origin ?? msg.from;
-    const relayer = this.agent(by);
-    this.life.noteRelay(origin, finalTo);
-    this.emit('message.relayed', [by, origin, finalTo],
-      `🔁 ${relayer.name} relaie à ${this.agent(finalTo).name} le message de ${this.agent(origin).name}.`, { messageId: msg.id });
-    this.send(by, finalTo, msg.kind, msg.body, { origin, replyTo: msg.replyTo, ballot: msg.ballot });
   }
 
   private advanceMessages() {
     for (const msg of Object.values(this.world.messages)) {
       // L'expéditeur ou le destinataire a quitté le village : la lettre se perd.
-      if ([msg.from, msg.to, msg.origin, msg.finalTo].some((id) => id && !this.agent(id))) {
+      if ([msg.from, msg.to].some((id) => !this.agent(id))) {
         delete this.world.messages[msg.id];
         continue;
       }
@@ -366,7 +356,14 @@ export class Sim {
       }
       const speed = isActive(this, 'storm') ? msg.speed * STORM_SLOWDOWN : msg.speed;
       msg.progress = Math.min(1, msg.progress + speed / roadLength(road, this.world.houses));
-      if (msg.progress >= 1) this.deliver(msg);
+      if (msg.progress < 1) continue;
+      if (msg.leg < msg.route.length - 1) {
+        // Étape suivante : on repart du bout de la route qu'on vient de parcourir.
+        msg.legFrom = road.a === msg.legFrom ? road.b : road.a;
+        msg.leg++;
+        msg.roadId = msg.route[msg.leg];
+        msg.progress = 0;
+      } else this.deliver(msg);
     }
   }
 
@@ -379,11 +376,6 @@ export class Sim {
     });
     this.remember(msg.from, msg.to, 'out', msg.body);
     this.remember(msg.to, msg.from, 'in', msg.body);
-
-    if (msg.finalTo && msg.finalTo !== msg.to) {
-      this.pending.push({ due: this.clock.tick + RELAY_DELAY, agentId: msg.to, actions: [], relay: msg });
-      return;
-    }
     this.receive(msg);
   }
 
@@ -417,7 +409,7 @@ export class Sim {
    */
   private sendInHouse(from: AgentId, to: AgentId, kind: MessageKind, body: string, ballot?: Ballot) {
     const msg: Message = {
-      id: `m${this.nextMsgId++}`, from, to, roadId: '', kind, body, ballot,
+      id: `m${this.nextMsgId++}`, from, to, route: [], leg: 0, roadId: '', legFrom: this.agent(from).houseId, kind, body, ballot,
       createdTick: this.clock.tick, progress: 1, speed: 0, status: 'delivered',
     };
     if (from !== to) this.emit('message.sent', [from, to], `${this.agent(from).name} → ${this.agent(to).name} (à la maison) : « ${body} »`, { messageId: msg.id, kind, body });
@@ -513,6 +505,7 @@ export class Sim {
     this.daily = new Daily();
     this.journal.restart();
     clearNews();
+    buildNetwork(this, { silent: true });
     this.broadcast({ type: 'snapshot', world: this.world, events: [] });
     this.emit('god.inject', [], preset === 'origine'
       ? '🔄 Nouvelle histoire : le hameau d’origine, ses cinq habitants et sa gazette.'

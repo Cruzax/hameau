@@ -9,6 +9,8 @@ export function facing(p: Vec2, target: Vec2): number {
 
 /** Point devant la porte d'une maison. */
 export function houseDoor(h: House): Vec2 {
+  // Un carrefour n'a pas de porte : la route passe par son centre.
+  if (h.kind === 'carrefour') return h.position;
   return {
     x: h.position.x + Math.sin(h.rotation) * DOOR_OFFSET,
     z: h.position.z + Math.cos(h.rotation) * DOOR_OFFSET,
