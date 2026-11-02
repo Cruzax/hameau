@@ -51,7 +51,7 @@ export function theftUrge(a: Agent, s: { satiete: number; pain: number; pieces: 
 }
 
 /** Pain gardé d'avance à la maison, et heure limite pour aller en acheter. */
-const BREAD_RESERVE = 2;
+const BREAD_RESERVE = 3;
 const SHOP_UNTIL = 21;
 
 /**

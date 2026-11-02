@@ -33,13 +33,14 @@ test('la chaîne blé → farine → pain nourrit le village', () => {
   const baked = sim.journal.events.filter((e) => e.type === 'life.work' && (e.payload as { work?: string }).work === 'pain').reduce((n, e) => n + ((e.payload as { qty?: number }).qty ?? 0), 0);
   assert.ok(baked >= 12, `seulement ${baked} pains cuits`);
   const buyer = agents[agents.length - 1];
-  buyer.inventory = { pain: 0, bois: 0, outils: 0, pieces: 4 };
+  // Le pain coûte une pièce ; on en achète jusqu'à quatre d'un coup.
+  buyer.inventory = { pain: 0, bois: 0, outils: 0, pieces: 3 };
   bakery.stock.pain = Math.max(bakery.stock.pain ?? 0, 10);
   const tillBefore = bakery.till;
-  assert.equal(eco.buyBread(sim, buyer), 2);
-  assert.equal(buyer.inventory.pain, 2);
+  assert.equal(eco.buyBread(sim, buyer), 3);
+  assert.equal(buyer.inventory.pain, 3);
   assert.equal(buyer.inventory.pieces, 0);
-  assert.equal(bakery.till, tillBefore + 4);
+  assert.equal(bakery.till, tillBefore + 3);
 });
 
 test('sans emploi, le potager donne un pain chaque matin', () => {
@@ -83,8 +84,8 @@ import { wantsBread } from '../sim/daily';
 
 test('on garde une petite réserve de pain, et on peut en acheter jusqu’à 21 h', () => {
   const fed = { satiete: 0.8 };
-  assert.equal(wantsBread(fed, { pain: 1, pieces: 4 }, 20), true);
-  assert.equal(wantsBread(fed, { pain: 2, pieces: 4 }, 12), false);
+  assert.equal(wantsBread(fed, { pain: 2, pieces: 4 }, 20), true);
+  assert.equal(wantsBread(fed, { pain: 3, pieces: 4 }, 12), false);
   assert.equal(wantsBread(fed, { pain: 0, pieces: 4 }, 22), false);
   assert.equal(wantsBread(fed, { pain: 0, pieces: 0 }, 12), false);
   assert.equal(wantsBread({ satiete: 0.1 }, { pain: 0, pieces: 0 }, 12), true); // affamé sans le sou : il demande
