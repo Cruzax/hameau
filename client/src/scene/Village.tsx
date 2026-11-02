@@ -7,7 +7,7 @@ import { Terrain } from './Terrain';
 import { River } from './River';
 import { Plaza } from './Plaza';
 import { Roads } from './Roads';
-import { House } from './House';
+import { House, WORKPLACE_LABEL } from './House';
 import { Trees } from './Trees';
 import { Messengers } from './Messengers';
 import { Bubbles } from './Bubbles';
@@ -81,6 +81,7 @@ export function Village() {
   // Sélecteurs séparés : un tick (horloge + messagers) ne re-rend pas les maisons ni le décor.
   const terrain = useHameau((s) => s.world.terrain);
   const housesById = useHameau((s) => s.world.houses);
+  const workplaces = useHameau((s) => s.world.workplaces ?? {});
   const roadsById = useHameau((s) => s.world.roads);
   const agents = useHameau((s) => s.world.agents);
   const mayorId = useHameau((s) => s.world.mayorId);
@@ -112,7 +113,9 @@ export function Village() {
 
       {houses.map((h) => {
         const owner = h.ownerId ? agents[h.ownerId] : undefined;
-        return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} />;
+        const wp = h.kind === 'travail' ? Object.values(workplaces).find((x) => x.houseId === h.id) : undefined;
+        const workplace = wp && { label: WORKPLACE_LABEL[wp.kind] ?? wp.kind, boss: wp.ownerId ? agents[wp.ownerId]?.name : undefined };
+        return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} workplace={workplace} />;
       })}
 
       <NatureSpots />

@@ -388,16 +388,90 @@ function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
           ))}
         </>
       );
+    case 'ferme':
+      return (
+        <>
+          {/* Champ de blé sur le côté, en carreaux dorés */}
+          <group position={[-dims.w / 2 - 2.2, 0, 0]}>
+            <Box args={[3.2, 0.06, 3.6]} position={[0, 0.03, 0]} color="#8a6a3a" />
+            {[-1.1, -0.37, 0.37, 1.1].map((x) =>
+              [-1.3, -0.45, 0.45, 1.3].map((z) => (
+                <Box key={`${x}${z}`} args={[0.62, 0.45, 0.7]} position={[x, 0.26, z]} color={(x + z) % 2 === 0 ? '#e0b84a' : '#d4a83c'} />
+              )),
+            )}
+          </group>
+          {/* Meules de foin */}
+          {[-0.6, 0.6].map((z) => (
+            <mesh key={z} position={[dims.w / 2 + 0.8, 0.45, z]} castShadow>
+              <cylinderGeometry args={[0.45, 0.55, 0.9, 8]} />
+              <meshStandardMaterial color="#d9b85a" flatShading />
+            </mesh>
+          ))}
+          {/* Grande porte de grange */}
+          <Box args={[1.6, 1.6, 0.08]} position={[dims.w * 0.25, 1.0, dims.d / 2 + 0.05]} color="#8a3a2a" />
+        </>
+      );
+    case 'moulin':
+      return <MillSails dims={dims} />;
+    case 'scierie':
+      return (
+        <>
+          {/* Tas de rondins et planches sciées */}
+          {[0, 1, 2].map((i) =>
+            [0, 1, 2 - i].map((j) => (
+              <mesh key={`${i}${j}`} position={[dims.w / 2 + 1.0, 0.2 + i * 0.36, -0.7 + j * 0.42 + i * 0.2]} rotation={[0, 0, Math.PI / 2]} castShadow>
+                <cylinderGeometry args={[0.18, 0.18, 1.8, 6]} />
+                <meshStandardMaterial color="#8a5f3c" flatShading />
+              </mesh>
+            )),
+          )}
+          {[0, 1, 2, 3].map((i) => (
+            <Box key={i} args={[1.8, 0.08, 0.35]} position={[-dims.w / 2 - 1.1, 0.06 + i * 0.09, 0.4]} color="#c8a070" />
+          ))}
+          {/* Grande lame circulaire sous l'auvent */}
+          <mesh position={[0, 1.1, dims.d / 2 + 0.5]} rotation={[0, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.55, 0.55, 0.05, 14]} />
+            <meshStandardMaterial color="#9aa0a8" metalness={0.4} roughness={0.4} />
+          </mesh>
+          <Box args={[dims.w + 0.6, 0.1, 1.4]} position={[0, dims.h + 0.25, dims.d / 2 + 0.6]} color={WOOD} />
+        </>
+      );
     default:
       return null;
   }
 }
 
+/** Ailes du moulin : quatre pales qui tournent lentement sur la façade. */
+function MillSails({ dims }: { dims: Dims }) {
+  const hub = useRef<Group>(null);
+  useFrame((_, dt) => {
+    if (hub.current) hub.current.rotation.z += dt * 0.6;
+  });
+  return (
+    <group position={[0, dims.h + 0.4, dims.d / 2 + 0.35]}>
+      <Box args={[0.3, 0.3, 0.5]} position={[0, 0, -0.1]} color={WOOD} />
+      <group ref={hub}>
+        {[0, 1, 2, 3].map((i) => (
+          <group key={i} rotation={[0, 0, (i * Math.PI) / 2]}>
+            <Box args={[0.12, 2.4, 0.06]} position={[0, 1.25, 0.1]} color={BEAM} />
+            <Box args={[0.6, 1.8, 0.03]} position={[0.32, 1.45, 0.12]} color="#efe6d2" />
+          </group>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+/** Nom affiché au-dessus d'un lieu de travail. */
+export const WORKPLACE_LABEL: Record<string, string> = {
+  ferme: 'Ferme', moulin: 'Moulin', scierie: 'Scierie', forge: 'Forge', boulangerie: 'Boulangerie', auberge: 'Auberge', herboristerie: 'Herboristerie',
+};
+
 /** Les maisons apparues en cours de partie « poussent » du sol (construction). */
 const BUILD_SECONDS = 1.6;
 const LOAD_GRACE_MS = 4000;
 
-export function House({ house, owner, isMayor }: { house: HouseData; owner?: Agent; isMayor: boolean }) {
+export function House({ house, owner, isMayor, workplace }: { house: HouseData; owner?: Agent; isMayor: boolean; workplace?: { label: string; boss?: string } }) {
   const dims = DIMS[house.style];
   const root = useRef<Group>(null);
   const born = useRef(performance.now());
@@ -453,6 +527,14 @@ export function House({ house, owner, isMayor }: { house: HouseData; owner?: Age
               {ROLE_LABEL[owner.role]}
             </div>
             <div className="house-label__name">{owner.name}</div>
+          </div>
+        </Html>
+      )}
+      {!owner && workplace && (
+        <Html position={[0, labelY, 0]} center zIndexRange={[10, 0]}>
+          <div className="house-label">
+            <div className="house-label__role" style={{ background: '#8a6a3a' }}>{workplace.label}</div>
+            {workplace.boss && <div className="house-label__name">{workplace.boss}</div>}
           </div>
         </Html>
       )}
