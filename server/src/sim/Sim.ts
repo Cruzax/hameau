@@ -106,9 +106,14 @@ export class Sim {
   // ─── Boucle ────────────────────────────────────────────────────────────────
 
   start() {
+    this.begin();
+    this.schedule();
+  }
+
+  /** Premier matin, sans minuterie : sert aussi aux simulations sans écran. */
+  begin() {
     this.startDay();
     this.flush();
-    this.schedule();
   }
 
   private schedule() {

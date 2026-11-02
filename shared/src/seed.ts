@@ -200,7 +200,7 @@ export function createSeedWorld(preset: VillagePreset = 'complet'): WorldState {
   const ids = new Set(houses.map((h) => h.id));
   const roads = SEED_ROADS.filter((r) => ids.has(r.a) && ids.has(r.b));
   return {
-    clock: { tick: 0, day: 1, ticksPerDay: 480, tickMs: 250, speed: 1, paused: false },
+    clock: { tick: 0, day: 1, ticksPerDay: 480, tickMs: 625, speed: 1, paused: false },
     terrain: TERRAIN,
     mayorId: 'maire',
     agents: byId(agents),
