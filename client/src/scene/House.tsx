@@ -549,10 +549,13 @@ export function House({ house, owner, isMayor, workplace }: { house: HouseData; 
       {owner && (
         <Html position={[0, labelY, 0]} center zIndexRange={[10, 0]}>
           <div className="house-label">
-            <div className="house-label__role" style={{ background: ROLE_COLOR[owner.role] }}>
-              {isMayor && <span className="house-label__crown">👑</span>}
-              {ROLE_LABEL[owner.role]}
-            </div>
+            {/* Un simple citoyen n'a que son nom ; le maire garde sa couronne même s'il était citoyen. */}
+            {(owner.role !== 'CITOYEN' || isMayor) && (
+              <div className="house-label__role" style={{ background: ROLE_COLOR[isMayor && owner.role === 'CITOYEN' ? 'MAIRE' : owner.role] }}>
+                {isMayor && <span className="house-label__crown">👑</span>}
+                {isMayor && owner.role === 'CITOYEN' ? ROLE_LABEL.MAIRE : ROLE_LABEL[owner.role]}
+              </div>
+            )}
             <div className="house-label__name">{owner.name}</div>
           </div>
         </Html>
