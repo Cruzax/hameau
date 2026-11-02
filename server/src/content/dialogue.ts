@@ -254,12 +254,28 @@ const SITUATIONS: { when: (c: TalkContext) => boolean; lines: (c: TalkContext) =
     ],
   },
   {
-    when: (c) => !!c.headline,
+    // On parle de moi dans la gazette : on ne commente pas sa propre nouvelle comme un étranger.
+    when: (c) => !!c.headline && mentions(c.headline, c.speaker.name),
+    lines: () => [
+      'T’as vu ? Je suis dans la gazette !',
+      'Oui, c’est bien de moi qu’ils parlent dans le journal.',
+      'Tout le monde me regarde depuis la gazette, c’est gênant.',
+      'J’ai découpé l’article, je le garde.',
+      'Me parle pas de la gazette, s’il te plaît.',
+    ],
+  },
+  {
+    when: (c) => !!c.headline && !mentions(c.headline, c.speaker.name),
     lines: (c) => [
-      `T’as lu la gazette ? « ${c.headline} »… Incroyable.`,
-      `« ${c.headline} », sérieux ? Tout le village en parle.`,
-      `Moi, l’histoire de « ${c.headline} », j’y crois moyen.`,
-      `Tu crois qu’ils ont tout dit, sur « ${c.headline} » ?`,
+      `T’as lu la gazette ? « ${c.headline} »`,
+      `« ${c.headline} »… Tout le village en parle.`,
+      `Alors, « ${c.headline} » : t’en penses quoi ?`,
+      `J’ai lu « ${c.headline} » ce matin, au petit-déj.`,
+      `Je l’ai appris par la gazette : « ${c.headline} ».`,
+      `Avec « ${c.headline} », y a de quoi causer pour la semaine.`,
+      `Le crieur l’a gueulé sur la place : « ${c.headline} ».`,
+      `« ${c.headline} » : qui l’eût cru ?`,
+      `On parle que de ça : « ${c.headline} ».`,
     ],
   },
   {
@@ -366,6 +382,24 @@ export const BANKS = { BY_ROLE, SITUATIONS, FRIENDLY, FLIRT, KIN, HOSTILE, COLD 
 
 const pick = <T>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
+/** Le titre parle-t-il de cette personne ? (prénom entier, pas un morceau d'un autre) */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const mentions = (text: string, name: string) => new RegExp(`(^|[^\\p{L}])${escapeRe(name)}([^\\p{L}]|$)`, 'u').test(text);
+
+/** Les dernières répliques entendues au village : on évite que tout le monde répète la même phrase. */
+const recent: string[] = [];
+const RECENT_MAX = 40;
+function pickFresh(lines: string[]): string {
+  const fresh = lines.filter((l) => !recent.includes(l));
+  // Tout a déjà été dit récemment : on reprend la phrase la plus ancienne.
+  const line = fresh.length ? pick(fresh) : lines.reduce((a, b) => (recent.lastIndexOf(a) <= recent.lastIndexOf(b) ? a : b));
+  const was = recent.indexOf(line);
+  if (was >= 0) recent.splice(was, 1);
+  recent.push(line);
+  if (recent.length > RECENT_MAX) recent.shift();
+  return line;
+}
+
 /** Ce qu'un habitant dit à un autre, en tenant compte de tout le contexte. */
 export function chooseExchange(c: TalkContext): Exchange {
   if (c.mutual < -0.4) {
@@ -385,7 +419,7 @@ export function chooseExchange(c: TalkContext): Exchange {
     return { line, reply, bond: 0.05 };
   }
   const situational = SITUATIONS.filter((s) => s.when(c));
-  if (situational.length && Math.random() < 0.6) return { line: pick(pick(situational).lines(c)), bond: 0.02 };
+  if (situational.length && Math.random() < 0.6) return { line: pickFresh(pick(situational).lines(c)), bond: 0.02 };
   if (c.mutual < 0) {
     const [line, reply] = pick(COLD);
     return { line, reply, bond: 0 };
@@ -394,7 +428,7 @@ export function chooseExchange(c: TalkContext): Exchange {
     const [line, reply] = pick(FRIENDLY);
     return { line, reply, bond: 0.04 };
   }
-  return { line: pick(BY_ROLE[c.speaker.role] ?? BY_ROLE.CITOYEN!), bond: 0.03 };
+  return { line: pickFresh(BY_ROLE[c.speaker.role] ?? BY_ROLE.CITOYEN!), bond: 0.03 };
 }
 
 /** Pensées qui traversent la tête d'un habitant seul (bulles en pointillés). */

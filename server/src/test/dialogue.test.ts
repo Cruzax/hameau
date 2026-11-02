@@ -67,3 +67,22 @@ test('on ne colporte pas une rumeur sur soi-même', () => {
   sim.world.rumors = [{ id: 'r1', kind: 'tresor', about: a.id, knownBy: [a.id], true: false, day: 1 } as never];
   assert.equal(rumorToShare(sim, a, b), undefined);
 });
+
+test('la gazette : on ne commente pas sa propre nouvelle comme un étranger, et on n’en doute pas', () => {
+  const mine = sample(ctx({ headline: 'Lina devient maire' }));
+  assert.ok(!mine.some((l) => l.includes('« Lina devient maire »')), 'Lina cite sa propre une');
+  const theirs = sample(ctx({ headline: 'Gabin devient maire' }));
+  assert.ok(theirs.some((l) => l.includes('« Gabin devient maire »')));
+  assert.ok(!theirs.some((l) => /j’y crois moyen/.test(l)));
+});
+
+test('deux habitants à la suite ne répètent pas la même phrase sur la gazette', () => {
+  const lines = BANKS.SITUATIONS.filter((s) => s.when(ctx({ headline: 'Gabin devient maire' })));
+  assert.ok(lines.some((s) => s.lines(ctx({ headline: 'x' })).length >= 8));
+  const said: string[] = [];
+  for (let i = 0; i < 400 && said.length < 6; i++) {
+    const l = chooseExchange(ctx({ headline: 'Gabin devient maire' })).line;
+    if (l.includes('Gabin devient maire')) said.push(l);
+  }
+  assert.equal(new Set(said).size, said.length, said.join(' | '));
+});

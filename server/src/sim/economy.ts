@@ -313,7 +313,12 @@ export class Economy {
       if (jobless > 2 && !openSlot) kind = (Object.keys(GROWTH_WEIGHT) as WorkplaceKind[]).sort((x, y) => count(x) / GROWTH_WEIGHT[x]! - count(y) / GROWTH_WEIGHT[y]!)[0];
     }
     if (!kind) return;
-    const founder = Object.values(w.agents).filter((a) => isAdult(w, a) && invOf(a).pieces >= FOUNDING_COST).sort((x, y) => invOf(y).pieces - invOf(x).pieces)[0];
+    // Qui fonde : d'abord ceux qui ne possèdent encore aucun commerce, pour que la fortune ne reste pas
+    // aux mêmes deux ou trois patrons ; à possessions égales, le plus riche.
+    const owned = (id: AgentId) => Object.values(w.workplaces).filter((x) => x.ownerId === id).length;
+    const founder = Object.values(w.agents)
+      .filter((a) => isAdult(w, a) && invOf(a).pieces >= FOUNDING_COST)
+      .sort((x, y) => owned(x.id) - owned(y.id) || invOf(y).pieces - invOf(x).pieces)[0];
     newWorkplace(sim, kind, founder?.id ?? null);
   }
 }

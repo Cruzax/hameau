@@ -18,7 +18,16 @@ const ADULT_AFTER_DAYS = 7;       // un enfant construit sa maison au bout de ce
 const NEWCOMER_CHANCE = 0.3;
 const LEAVE_CHANCE = 0.3;
 
-const NAMES = ['Léa', 'Hugo', 'Jade', 'Nathan', 'Chloé', 'Lucas', 'Emma', 'Tom', 'Zoé', 'Noah', 'Sacha', 'Lina', 'Gabin', 'Rose', 'Malo', 'Nina', 'Théo', 'Alba'];
+const NAMES = [
+  'Léa', 'Hugo', 'Jade', 'Nathan', 'Chloé', 'Lucas', 'Emma', 'Tom', 'Zoé', 'Noah', 'Sacha', 'Lina', 'Gabin', 'Rose', 'Malo', 'Nina', 'Théo', 'Alba',
+  'Camille', 'Louis', 'Inès', 'Jules', 'Manon', 'Arthur', 'Lou', 'Paul', 'Margaux', 'Victor', 'Alice', 'Raphaël', 'Elsa', 'Adam', 'Iris', 'Martin',
+  'Louise', 'Simon', 'Anna', 'Basile', 'Clara', 'Émile', 'Juliette', 'Léon', 'Maëlle', 'Oscar', 'Agathe', 'Marius', 'Romane', 'Félix', 'Mila', 'Gaspard',
+  'Capucine', 'Augustin', 'Suzanne', 'Barnabé', 'Héloïse', 'Lazare', 'Apolline', 'Célestin', 'Éloïse', 'Achille', 'Margot', 'Aimé', 'Bérénice', 'Ernest',
+  'Colette', 'Firmin', 'Odile', 'Gaston', 'Mathilde', 'Hector', 'Blanche', 'Ambroise', 'Jeanne', 'Clovis', 'Lucie', 'Anatole', 'Adèle', 'Eugène',
+  'Constance', 'Fernand', 'Albane', 'Octave', 'Philippine', 'Valentin', 'Sixtine', 'Edgar', 'Garance', 'Honoré', 'Ysée', 'Joseph', 'Aurore', 'Bastien',
+  'Céleste', 'Dorian', 'Fleur', 'Gauthier', 'Hortense', 'Ilan', 'Joséphine', 'Kylian', 'Livia', 'Mathis', 'Noémie', 'Pierre', 'Salomé', 'Tristan',
+  'Ange', 'Charlie', 'Morgan', 'Alix', 'Eden', 'Maxime', 'Andréa', 'Dominique', 'Claude', 'Lou-Ann', 'Noa', 'Sasha', 'Yaël', 'Élie', 'Swann',
+];
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
 
 /** Où bâtir une maison neuve : près d'un lieu de travail qui embauche (les quartiers se forment), sinon près de la place. */
@@ -38,6 +47,8 @@ export class Life {
   /** Jour de formation des couples. */
   private coupledSince = new Map<string, number>();
   private isolatedDays = new Map<AgentId, number>();
+  /** Tous les prénoms déjà portés au village, même par ceux qui sont partis : jamais deux fois le même. */
+  private usedNames = new Set<string>();
 
   onDayEnd(sim: Sim) {
     this.couples(sim);
@@ -50,6 +61,16 @@ export class Life {
 
   private pick<T>(xs: T[]): T {
     return xs[Math.floor(this.rand() * xs.length)];
+  }
+
+  /** Un prénom que personne n'a jamais porté ici ; si la liste est épuisée, un prénom composé. */
+  private freshName(sim: Sim): string {
+    for (const a of Object.values(sim.world.agents)) this.usedNames.add(a.name);
+    const free = NAMES.filter((n) => !this.usedNames.has(n));
+    let name = free.length ? this.pick(free) : '';
+    while (!name || this.usedNames.has(name)) name = `${this.pick(NAMES)}-${this.pick(NAMES)}`;
+    this.usedNames.add(name);
+    return name;
   }
 
   private remember(a: Agent, line: string) {
@@ -134,8 +155,7 @@ export class Life {
 
   private birth(sim: Sim, a: Agent, b: Agent) {
     const w = sim.world;
-    const taken = new Set(Object.values(w.agents).map((x) => x.name));
-    const name = this.pick(NAMES.filter((n) => !taken.has(n))) ?? `Petit ${a.name}`;
+    const name = this.freshName(sim);
     const id = slug(sim, name);
     const inherited = [...a.personality.traits, ...b.personality.traits].filter(() => this.rand() < 0.35).slice(0, 2);
     const child: Agent = {
@@ -242,9 +262,7 @@ export class Life {
   private newcomers(sim: Sim) {
     const w = sim.world;
     if (Object.keys(w.agents).length >= MAX_POPULATION || this.rand() > NEWCOMER_CHANCE) return;
-    const taken = new Set(Object.values(w.agents).map((x) => x.name));
-    const name = this.pick(NAMES.filter((n) => !taken.has(n)));
-    if (!name) return;
+    const name = this.freshName(sim);
     const id = slug(sim, name);
     const r = this.rand();
     const role: Role = r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';

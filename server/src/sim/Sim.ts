@@ -25,7 +25,7 @@ import { Politics } from './politics';
 import { Life } from './life';
 import { Daily } from './daily';
 import { Economy } from './economy';
-import { gazetteStaff, pickHeadline, score, SPECIAL_EDITION } from './newsworthy';
+import { gazetteStaff, HEADLINE_MIN, pickHeadline, score, SMALL_VILLAGE, SMALL_VILLAGE_MIN, SPECIAL_EDITION } from './newsworthy';
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
@@ -175,7 +175,8 @@ export class Sim {
     const recent = this.journal.events.filter((e) => e.day >= day - 1);
     const special = recent.some((e) => e.day === day && score(e) >= SPECIAL_EDITION);
     if (this.issuesToday >= (special ? 2 : 1)) return;
-    const headline = pickHeadline(recent, this.coveredNews);
+    const small = Object.keys(this.world.agents).length < SMALL_VILLAGE;
+    const headline = pickHeadline(recent, this.coveredNews, small ? SMALL_VILLAGE_MIN : HEADLINE_MIN);
     if (!headline) return;
     this.coveredNews.add(headline.seq);
     this.issueSince = this.clock.tick;

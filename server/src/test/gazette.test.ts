@@ -95,3 +95,9 @@ test('à poids égal ou proche, la nouvelle du jour passe avant celle de la veil
   const today = { ...ev(2, 'crime.theft', '🚨 Vol chez Lina'), day: 2 } as SimEvent;
   assert.equal(pickHeadline([yesterday, today], new Set())?.seq, 2);
 });
+
+test('dans un tout petit hameau, un nouveau voisin suffit à faire la une', () => {
+  const events = [ev(1, 'agent.added', '🚶 Nina s’installe')];
+  assert.equal(pickHeadline(events, new Set()), null);
+  assert.equal(pickHeadline(events, new Set(), 3)?.seq, 1);
+});

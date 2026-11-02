@@ -79,3 +79,16 @@ test('pas assez de pain pour tout le monde : une boulangerie de plus', () => {
   eco.evening(sim);
   assert.equal(Object.values(w.workplaces).filter((x) => x.kind === 'boulangerie').length, 2);
 });
+
+test('un nouveau patron passe avant celui qui possède déjà un commerce', () => {
+  const { sim, w, eco } = village([
+    { kind: 'boulangerie', till: 30, slots: 0 }, { kind: 'ferme', till: 30, slots: 0 }, { kind: 'moulin', till: 30, slots: 0 }, { kind: 'scierie', till: 30, slots: 0 },
+  ]);
+  const [boss, newcomer] = [Object.values(w.agents)[3], Object.values(w.agents)[4]];
+  boss.inventory = { pain: 0, bois: 0, outils: 0, pieces: 80 };
+  newcomer.inventory = { pain: 0, bois: 0, outils: 0, pieces: 30 };
+  Object.values(w.workplaces)[0].ownerId = boss.id;
+  const before = Object.keys(w.workplaces).length;
+  eco.evening(sim);
+  assert.equal(Object.values(w.workplaces).slice(before)[0]?.ownerId, newcomer.id);
+});

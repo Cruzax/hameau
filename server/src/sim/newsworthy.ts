@@ -5,6 +5,9 @@ import type { AgentId, SimEvent, WorldState } from '@hameau/shared';
 
 /** Poids minimal pour mériter un numéro. */
 export const HEADLINE_MIN = 4;
+/** Dans un tout petit hameau, un nouveau voisin ou une fête suffit à faire parler. */
+export const SMALL_VILLAGE = 10;
+export const SMALL_VILLAGE_MIN = 3;
 /** À partir de ce poids, un second numéro (édition spéciale) peut paraître le même jour. */
 export const SPECIAL_EDITION = 10;
 /** Malus d'une nouvelle de la veille dans le choix de la une. */
@@ -31,7 +34,7 @@ export function score(e: SimEvent): number {
 }
 
 /** Le meilleur événement non couvert (par numéro de séquence), ou null s'il ne vaut pas un numéro. */
-export function pickHeadline(events: SimEvent[], covered: Set<number>): SimEvent | null {
+export function pickHeadline(events: SimEvent[], covered: Set<number>, min = HEADLINE_MIN): SimEvent | null {
   const fresh = events.filter((e) => !covered.has(e.seq));
   const hungry = fresh.filter((e) => /meurt de faim/.test(e.text));
   const candidates = fresh.map((e) => ({ e, s: score(e) }));
@@ -43,7 +46,7 @@ export function pickHeadline(events: SimEvent[], covered: Set<number>): SimEvent
   const today = Math.max(0, ...events.map((e) => e.day));
   const rank = (c: { e: SimEvent; s: number }) => c.s - (c.e.day < today ? STALE_PENALTY : 0);
   const best = candidates.sort((a, b) => rank(b) - rank(a))[0];
-  return best && best.s >= HEADLINE_MIN ? best.e : null;
+  return best && best.s >= min ? best.e : null;
 }
 
 export type GazetteStep = 'ECLAIREUR' | 'ECRIVAIN' | 'EDITEUR' | 'LECTEUR';
