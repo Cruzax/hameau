@@ -18,16 +18,22 @@ const ADULT_AFTER_DAYS = 7;       // un enfant construit sa maison au bout de ce
 const NEWCOMER_CHANCE = 0.3;
 const LEAVE_CHANCE = 0.3;
 
-const NAMES = [
-  'Léa', 'Hugo', 'Jade', 'Nathan', 'Chloé', 'Lucas', 'Emma', 'Tom', 'Zoé', 'Noah', 'Sacha', 'Lina', 'Gabin', 'Rose', 'Malo', 'Nina', 'Théo', 'Alba',
-  'Camille', 'Louis', 'Inès', 'Jules', 'Manon', 'Arthur', 'Lou', 'Paul', 'Margaux', 'Victor', 'Alice', 'Raphaël', 'Elsa', 'Adam', 'Iris', 'Martin',
-  'Louise', 'Simon', 'Anna', 'Basile', 'Clara', 'Émile', 'Juliette', 'Léon', 'Maëlle', 'Oscar', 'Agathe', 'Marius', 'Romane', 'Félix', 'Mila', 'Gaspard',
-  'Capucine', 'Augustin', 'Suzanne', 'Barnabé', 'Héloïse', 'Lazare', 'Apolline', 'Célestin', 'Éloïse', 'Achille', 'Margot', 'Aimé', 'Bérénice', 'Ernest',
-  'Colette', 'Firmin', 'Odile', 'Gaston', 'Mathilde', 'Hector', 'Blanche', 'Ambroise', 'Jeanne', 'Clovis', 'Lucie', 'Anatole', 'Adèle', 'Eugène',
-  'Constance', 'Fernand', 'Albane', 'Octave', 'Philippine', 'Valentin', 'Sixtine', 'Edgar', 'Garance', 'Honoré', 'Ysée', 'Joseph', 'Aurore', 'Bastien',
-  'Céleste', 'Dorian', 'Fleur', 'Gauthier', 'Hortense', 'Ilan', 'Joséphine', 'Kylian', 'Livia', 'Mathis', 'Noémie', 'Pierre', 'Salomé', 'Tristan',
-  'Ange', 'Charlie', 'Morgan', 'Alix', 'Eden', 'Maxime', 'Andréa', 'Dominique', 'Claude', 'Lou-Ann', 'Noa', 'Sasha', 'Yaël', 'Élie', 'Swann',
-];
+/** Prénoms selon le sexe ; les prénoms mixtes vont à tout le monde. */
+const NAMES: Record<'M' | 'F' | 'X', string[]> = {
+  F: [
+    'Léa', 'Jade', 'Chloé', 'Emma', 'Zoé', 'Lina', 'Rose', 'Nina', 'Alba', 'Inès', 'Manon', 'Margaux', 'Alice', 'Elsa', 'Iris', 'Louise', 'Anna',
+    'Clara', 'Juliette', 'Maëlle', 'Agathe', 'Romane', 'Mila', 'Capucine', 'Suzanne', 'Héloïse', 'Apolline', 'Éloïse', 'Margot', 'Bérénice', 'Colette',
+    'Odile', 'Mathilde', 'Blanche', 'Jeanne', 'Lucie', 'Adèle', 'Constance', 'Albane', 'Philippine', 'Sixtine', 'Garance', 'Ysée', 'Aurore', 'Fleur',
+    'Hortense', 'Joséphine', 'Livia', 'Noémie', 'Salomé', 'Lou-Ann', 'Céleste',
+  ],
+  M: [
+    'Hugo', 'Nathan', 'Lucas', 'Tom', 'Noah', 'Gabin', 'Malo', 'Théo', 'Louis', 'Jules', 'Arthur', 'Paul', 'Victor', 'Raphaël', 'Adam', 'Martin',
+    'Simon', 'Basile', 'Émile', 'Léon', 'Oscar', 'Marius', 'Félix', 'Gaspard', 'Augustin', 'Barnabé', 'Lazare', 'Célestin', 'Achille', 'Aimé',
+    'Ernest', 'Firmin', 'Gaston', 'Hector', 'Ambroise', 'Clovis', 'Anatole', 'Eugène', 'Fernand', 'Octave', 'Valentin', 'Edgar', 'Honoré', 'Joseph',
+    'Bastien', 'Dorian', 'Gauthier', 'Ilan', 'Kylian', 'Mathis', 'Pierre', 'Tristan', 'Élie', 'Maxime',
+  ],
+  X: ['Sacha', 'Camille', 'Lou', 'Ange', 'Charlie', 'Morgan', 'Alix', 'Eden', 'Andréa', 'Dominique', 'Claude', 'Noa', 'Yaël', 'Swann'],
+};
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
 
 /** Où bâtir une maison neuve : près d'un lieu de travail qui embauche (les quartiers se forment), sinon près de la place. */
@@ -63,12 +69,13 @@ export class Life {
     return xs[Math.floor(this.rand() * xs.length)];
   }
 
-  /** Un prénom que personne n'a jamais porté ici ; si la liste est épuisée, un prénom composé. */
-  private freshName(sim: Sim): string {
+  /** Un prénom qui va avec le sexe et que personne n'a jamais porté ici ; si la liste est épuisée, un prénom composé. */
+  private freshName(sim: Sim, sex: 'M' | 'F'): string {
     for (const a of Object.values(sim.world.agents)) this.usedNames.add(a.name);
-    const free = NAMES.filter((n) => !this.usedNames.has(n));
+    const pool = [...NAMES[sex], ...NAMES.X];
+    const free = pool.filter((n) => !this.usedNames.has(n));
     let name = free.length ? this.pick(free) : '';
-    while (!name || this.usedNames.has(name)) name = `${this.pick(NAMES)}-${this.pick(NAMES)}`;
+    while (!name || this.usedNames.has(name)) name = `${this.pick(NAMES[sex])}-${this.pick(pool)}`;
     this.usedNames.add(name);
     return name;
   }
@@ -155,7 +162,8 @@ export class Life {
 
   private birth(sim: Sim, a: Agent, b: Agent) {
     const w = sim.world;
-    const name = this.freshName(sim);
+    const sex = this.rand() < 0.5 ? 'M' : 'F';
+    const name = this.freshName(sim, sex);
     const id = slug(sim, name);
     const inherited = [...a.personality.traits, ...b.personality.traits].filter(() => this.rand() < 0.35).slice(0, 2);
     const child: Agent = {
@@ -174,7 +182,7 @@ export class Life {
       lastActionTick: sim.clock.tick,
       bornDay: sim.clock.day,
       family: { parentIds: [a.id, b.id], childIds: [] },
-      sex: this.rand() < 0.5 ? 'M' : 'F',
+      sex,
       orientation: randomOrientation(this.rand()),
     };
     for (const other of Object.values(w.agents)) {
@@ -262,7 +270,8 @@ export class Life {
   private newcomers(sim: Sim) {
     const w = sim.world;
     if (Object.keys(w.agents).length >= MAX_POPULATION || this.rand() > NEWCOMER_CHANCE) return;
-    const name = this.freshName(sim);
+    const sex = this.rand() < 0.5 ? 'M' : 'F';
+    const name = this.freshName(sim, sex);
     const id = slug(sim, name);
     const r = this.rand();
     const role: Role = r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
@@ -280,7 +289,7 @@ export class Life {
         ambition: this.rand(),
       },
       goals: role === 'MENTEUR' ? ['Semer la zizanie sans se faire prendre'] : ['Se faire accepter au village'],
-      sex: this.rand() < 0.5 ? 'M' : 'F',
+      sex,
       orientation: randomOrientation(this.rand()),
       memory: { short: [], long: '' },
       opinions: {},
