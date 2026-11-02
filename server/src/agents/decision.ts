@@ -108,8 +108,7 @@ export function toActions(world: WorldState, agent: Agent, d: Decision): Action[
     if (place && place !== agent.id) actions.push({ type: 'go', place });
   }
 
-  const alreadyPublished = world.gazettes.some((g) => g.day === world.clock.day);
-  if (d.publish && agent.id === world.mayorId && !alreadyPublished && d.publish.headline.trim()) {
+  if (d.publish && agent.id === world.mayorId && d.publish.headline.trim()) {
     actions.push({
       type: 'publish',
       gazette: {

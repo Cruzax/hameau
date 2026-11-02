@@ -7,6 +7,7 @@ import {
 } from '../content/gazette';
 import { takeNews } from '../content/news';
 import { neighbors } from '../sim/network';
+import { gazetteStaff } from '../sim/newsworthy';
 
 // Réponses scriptées du mode mock : zéro appel LLM, comportement crédible pour tester la simulation.
 
@@ -48,7 +49,6 @@ export function createScript(seed = Date.now()) {
     return undefined;
   };
 
-  const byRole = (w: WorldState, role: Role): AgentId | undefined => Object.values(w.agents).find((a) => a.role === role)?.id;
 
   return {
     rand,
@@ -63,19 +63,12 @@ export function createScript(seed = Date.now()) {
     /** Ce que ferait l'agent « par défaut » : la gazette suit son circuit, les humeurs suivent. */
     decide(w: WorldState, agent: Agent, trigger: Trigger): Decision {
       const isMayor = agent.id === w.mayorId;
-      if (trigger.type === 'day') {
-        const scout = byRole(w, 'ECLAIREUR');
-        if (!isMayor || !scout) return decision({});
-        return decision({ thought: 'Nouvelle journée. Il nous faut une gazette !', messages: [{ to: scout, kind: 'task', body: pick(TASKS) }] });
-      }
-      if (trigger.type === 'deadline') {
-        const d = w.gazetteDraft;
-        const headline = day.topic ?? d?.topic;
-        if (!isMayor || !headline) return decision({ thought: 'Pas de gazette aujourd’hui… le village va grogner.' });
-        return decision({
-          thought: 'Tant pis pour la perfection, on publie !',
-          publish: { headline, body: d?.edited ?? d?.draft ?? day.edited ?? headline },
-        });
+      const staff = gazetteStaff(w);
+      if (trigger.type === 'day' || trigger.type === 'deadline') return decision({});
+      if (trigger.type === 'news') {
+        // Il s'est passé quelque chose : le maire lance la gazette.
+        if (!isMayor) return decision({});
+        return decision({ thought: 'Voilà qui mérite un numéro !', messages: [{ to: staff.ECLAIREUR, kind: 'task', body: pick(TASKS) }] });
       }
       if (trigger.type === 'inject') {
         injected.push(trigger.text);
@@ -83,18 +76,21 @@ export function createScript(seed = Date.now()) {
       }
       const msg = trigger.msg;
       const from = msg.origin ?? msg.from;
-      const writer = byRole(w, 'ECRIVAIN');
-      const editor = byRole(w, 'EDITEUR');
-      const reader = byRole(w, 'LECTEUR');
+      // Dans un petit village, une même personne peut tenir plusieurs étapes.
+      const writer = staff.ECRIVAIN;
+      const editor = staff.EDITEUR;
+      const reader = staff.LECTEUR;
+      const asksReview = msg.kind === 'task' && /avis/i.test(msg.body);
 
-      if (agent.role === 'ECLAIREUR' && msg.kind === 'task' && writer) {
+      if (agent.id === reader && asksReview) return review();
+      if (agent.id === staff.ECLAIREUR && msg.kind === 'task' && !asksReview) {
         // Priorité : un événement injecté, puis une vraie nouvelle du village, sinon un sujet de secours.
         const unused = TOPICS.filter((t) => !usedTopics.has(t));
         day.topic = injected.shift() ?? (rand() < 0.75 ? freshNews() : undefined) ?? pick(unused.length ? unused : TOPICS);
         usedTopics.add(day.topic);
         return decision({ thought: pick(SCOUTING), messages: [{ to: writer, kind: 'topic', body: `Sujet : ${day.topic} !` }] });
       }
-      if (agent.role === 'ECRIVAIN' && msg.kind === 'topic' && editor) {
+      if (agent.id === writer && msg.kind === 'topic') {
         // Attaque + développement + chute, avec de vrais habitants ; le titre n'est pas recopié.
         const topic = day.topic ?? msg.body.replace(/^Sujet : |\s*!$/g, '');
         const names = Object.values(w.agents).filter((x) => x.id !== agent.id).map((x) => x.name);
@@ -105,17 +101,17 @@ export function createScript(seed = Date.now()) {
         const draft = [lead, middle, fresh(DRAFT_ENDINGS)].join(' ');
         return decision({ thought: 'Laissez-moi trouver les mots justes…', messages: [{ to: editor, kind: 'draft', body: draft }] });
       }
-      if (agent.role === 'EDITEUR' && msg.kind === 'draft') {
+      if (agent.id === editor && msg.kind === 'draft') {
         // On resserre, parfois : la phrase du milieu saute une fois sur deux.
         // Coupe entre deux phrases, jamais au milieu d'une citation « … ».
         const parts = msg.body.split(/(?<=[.!?…]|[.!?…] »)\s+(?=[A-ZÀ-Ý«])/);
         day.edited = (parts.length > 2 && rand() < 0.5 ? [parts[0], ...parts.slice(2)] : parts).join(' ');
         return decision({ thought: 'Trop long. Je coupe.', messages: [{ to: w.mayorId, kind: 'edit', body: day.edited }] });
       }
-      if (isMayor && msg.kind === 'edit' && reader) {
+      if (isMayor && msg.kind === 'edit') {
         return decision({ messages: [{ to: reader, kind: 'task', body: `Ton avis avant publication ? « ${msg.body} »` }] });
       }
-      if (agent.role === 'LECTEUR' && msg.kind === 'task') {
+      function review(): Decision {
         // La note dépend de l'humeur du lecteur, de la nouveauté du thème et de la longueur du texte.
         const theme = themeOf(day.topic ?? '');
         const last = readerLog.at(-1);
@@ -137,7 +133,8 @@ export function createScript(seed = Date.now()) {
       }
       if (isMayor && msg.kind === 'review' && day.topic) {
         const harsh = (day.review ?? 3) <= 2;
-        const ok = !harsh || rand() < 0.5;
+        // Une vraie nouvelle se publie toujours ; un avis sévère fâche seulement le lecteur.
+        const ok = true;
         if (!ok) {
           return decision({
             thought: 'La critique est trop dure… je ne publie pas ça.',

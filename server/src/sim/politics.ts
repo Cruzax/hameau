@@ -1,5 +1,6 @@
 import { dayFraction, de, type AgentId, type Ballot, type Message, type VoteSession } from '@hameau/shared';
 import type { Sim } from './Sim';
+import { isAdult } from './economy';
 
 /** Le conseil s'ouvre à 10 h et les bulletins doivent être arrivés avant 20 h. */
 const OPEN_AT = dayFraction(10);
@@ -29,15 +30,22 @@ export class Politics {
   private lastProposer: string | null = null;
 
   /** Humeur du village envers le maire, chaque soir : la gazette est son bilan, et le pouvoir use. */
-  onDayEnd(sim: Sim, published: boolean) {
+  /**
+   * Le soir, chacun juge le maire sur sa propre journée : avoir eu faim, être sans emploi, avoir été payé.
+   * Un numéro paru rassure un peu ; une grosse affaire sans numéro passe pour étouffée. Le pouvoir use.
+   */
+  onDayEnd(sim: Sim, day: { issues: number; stifled: boolean; hungry: Set<string>; paid: Set<string> }) {
     const mayor = sim.world.mayorId;
     const tenure = sim.clock.day - this.mayorSince;
     // Au-delà de six jours, chaque jour de plus agace un peu plus (plafonné).
     const wear = tenure > 6 ? Math.min(0.05, (tenure - 6) * 0.005) : 0;
     for (const a of Object.values(sim.world.agents)) {
       if (a.id === mayor) continue;
-      if (published) sim.adjustOpinion(a.id, mayor, 0.035);
-      else sim.adjustOpinion(a.id, mayor, -0.15, 'Pas de gazette aujourd’hui, à quoi sert le maire ?');
+      if (day.hungry.has(a.id)) sim.adjustOpinion(a.id, mayor, -0.04, 'J’ai eu faim, et le maire ne fait rien');
+      if (!a.job && isAdult(sim.world, a)) sim.adjustOpinion(a.id, mayor, -0.03);
+      if (day.paid.has(a.id)) sim.adjustOpinion(a.id, mayor, 0.02);
+      if (day.issues) sim.adjustOpinion(a.id, mayor, 0.02 * day.issues);
+      if (day.stifled) sim.adjustOpinion(a.id, mayor, -0.05, 'Le maire étouffe l’affaire');
       if (wear) sim.adjustOpinion(a.id, mayor, -wear);
       // Les ambitieux grignotent leur estime du maire, jour après jour.
       sim.adjustOpinion(a.id, mayor, -(a.personality.ambition - 0.3) * 0.1);

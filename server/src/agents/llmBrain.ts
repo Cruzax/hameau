@@ -30,6 +30,11 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
   /** Réserve un appel dans le budget du jour. false si le budget est épuisé. */
   function reserve(sim: Sim): boolean {
     const b = sim.world.llm.budget;
+    // Le mode gratuit ne coûte rien : on compte les appels, sans plafond.
+    if (provider.name === 'mock') {
+      b.callsToday++;
+      return true;
+    }
     if (b.callsToday < b.maxCallsPerDay) {
       b.callsToday++;
       return true;
@@ -91,7 +96,6 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
       const b = sim.world.llm.budget;
       b.maxCallsPerDay = Math.max(LLM_CONFIG.maxCallsPerDay, CALLS_PER_RESIDENT * Object.keys(sim.world.agents).length);
       sim.touchLLM();
-      void wake(sim, sim.world.mayorId, { type: 'day' });
     },
 
     onMessage(sim, agent, msg) {
@@ -99,9 +103,11 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
       void wake(sim, agent.id, { type: 'message', msg });
     },
 
-    onDeadline(sim) {
-      if (sim.world.gazettes.some((g) => g.day === sim.clock.day)) return;
-      void wake(sim, sim.world.mayorId, { type: 'deadline' });
+    onNews(sim, headline) {
+      // Nouveau numéro : le dossier repart de zéro, le sujet est tout trouvé.
+      script.newDay();
+      script.inject(headline);
+      void wake(sim, sim.world.mayorId, { type: 'news', text: headline });
     },
 
     onInject(sim, text) {

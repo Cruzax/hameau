@@ -24,6 +24,7 @@ import { Politics } from './politics';
 import { Life } from './life';
 import { Daily } from './daily';
 import { Economy } from './economy';
+import { gazetteStaff, pickHeadline, score, SPECIAL_EDITION } from './newsworthy';
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
@@ -35,10 +36,13 @@ const RELAY_DELAY = 4;
 /** Les bulletins de vote sont portés au pas de course, pour arriver avant la clôture. */
 const BALLOT_SPEEDUP = 1.8;
 /** Les textes de la gazette voyagent aussi plus vite, pour paraître avant le soir. */
-const GAZETTE_SPEEDUP = 1.5;
+const GAZETTE_SPEEDUP = 3;
 const GAZETTE_KINDS: MessageKind[] = ['task', 'topic', 'draft', 'edit', 'review'];
 /** Heures où l'on rappelle au maire que la gazette n'est pas parue. */
-const DEADLINE_HOURS = [16, 19];
+/** Heures où la rédaction regarde s'il y a de quoi faire un numéro. */
+const NEWS_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+/** Un numéro lancé et jamais publié est abandonné au bout de ce temps (en heures). */
+const ISSUE_TIMEOUT_HOURS = 12;
 
 export type Action =
   | { type: 'send'; to: AgentId; kind: MessageKind; body: string; replyTo?: string }
@@ -58,8 +62,8 @@ export interface Brain {
   onInject?(sim: Sim, text: string): void;
   /** Un vote de destitution s'ouvre : chaque agent doit envoyer un bulletin (action 'ballot'). */
   onVoteOpened?(sim: Sim, vote: VoteSession): void;
-  /** 19 h et pas de gazette : dernier rappel au maire. */
-  onDeadline?(sim: Sim): void;
+  /** Il s'est passé quelque chose qui mérite un numéro : le maire lance la gazette. */
+  onNews?(sim: Sim, headline: string): void;
 }
 
 /** Ce qui mérite d'être proposé comme sujet de gazette. */
@@ -148,16 +152,40 @@ export class Sim {
     this.advanceMessages();
     this.runPending();
     this.politics.onTick(this);
-    if (DEADLINE_HOURS.some((h) => this.dayTick === Math.round(this.clock.ticksPerDay * dayFraction(h)))) this.brain.onDeadline?.(this);
+    if (NEWS_HOURS.some((h) => this.dayTick === Math.round(this.clock.ticksPerDay * dayFraction(h)))) this.newsDesk();
     this.daily.onTick(this);
     tickEffects(this);
     this.brain.onTick?.(this);
     this.flush();
   }
 
+  /** Événements déjà couverts par un numéro (numéros de séquence). */
+  private coveredNews = new Set<number>();
+  /** Tick où le numéro en cours a été lancé, ou null. */
+  private issueSince: number | null = null;
+  private issuesToday = 0;
+
+  /** Chaque heure de la journée : s'il s'est passé quelque chose, le maire lance un numéro. */
+  private newsDesk() {
+    const ticksPerHour = this.clock.ticksPerDay / 24;
+    if (this.issueSince !== null && this.clock.tick - this.issueSince < ISSUE_TIMEOUT_HOURS * ticksPerHour) return;
+    this.issueSince = null;
+    const day = this.clock.day;
+    const recent = this.journal.events.filter((e) => e.day >= day - 1);
+    const special = recent.some((e) => e.day === day && score(e) >= SPECIAL_EDITION);
+    if (this.issuesToday >= (special ? 2 : 1)) return;
+    const headline = pickHeadline(recent, this.coveredNews);
+    if (!headline) return;
+    this.coveredNews.add(headline.seq);
+    this.issueSince = this.clock.tick;
+    this.world.gazetteDraft = { day };
+    this.brain.onNews?.(this, headline.text.replace(/^[^\p{L}]+/u, '').split(/[.!]/)[0].trim());
+  }
+
   private startDay() {
     this.emit('day.start', [], `☀️ Jour ${this.clock.day} — le village se réveille.`);
     this.world.gazetteDraft = { day: this.clock.day };
+    this.issuesToday = 0;
     this.daily.morning(this);
     this.economy.morning(this);
     this.brain.onDayStart(this);
@@ -167,7 +195,11 @@ export class Sim {
     const published = this.world.gazettes.some((g) => g.day === this.clock.day);
     this.economy.evening(this);
     this.brain.onDayEnd?.(this);
-    this.politics.onDayEnd(this, published);
+    const today = this.journal.events.filter((e) => e.day === this.clock.day);
+    const hungry = new Set(today.filter((e) => /meurt de faim/.test(e.text)).flatMap((e) => e.actors));
+    const issues = this.world.gazettes.filter((g) => g.day === this.clock.day).length;
+    const stifled = today.some((e) => score(e) >= 6 && !this.coveredNews.has(e.seq));
+    this.politics.onDayEnd(this, { issues, stifled, hungry, paid: this.economy.paidToday });
     if (this.lifeEnabled) {
       // Le voisinage rapproche : un peu d'estime en plus entre voisins directs, chaque soir.
       for (const a of Object.values(this.world.agents)) for (const n of neighbors(this.world, a.id)) this.adjustOpinion(a.id, n, 0.02);
@@ -247,6 +279,8 @@ export class Sim {
         this.send(agentId, a.to, a.kind, a.body, { replyTo: a.replyTo });
         break;
       case 'publish': {
+        // On ne publie que lorsqu'un numéro est en cours (lancé par un événement).
+        if (this.issueSince === null) break;
         const dossier = this.world.gazetteDraft;
         const article = a.gazette.articles[0];
         const body = dossier?.edited ?? dossier?.draft;
@@ -261,6 +295,8 @@ export class Sim {
         };
         this.world.gazettes.push(g);
         this.emit('gazette.published', [agentId], `📰 La Gazette du jour ${g.day} paraît : « ${g.headline} »`, { gazette: g });
+        this.issueSince = null;
+        this.issuesToday++;
         this.daily.payGazette(this);
         this.broadcast({ type: 'patch', world: { gazettes: this.world.gazettes } });
         break;
@@ -395,8 +431,7 @@ export class Sim {
     if (msg.kind === 'draft') Object.assign(d, { draft: msg.body, draftBy: by });
     if (msg.kind === 'edit') Object.assign(d, { edited: msg.body.replace(/^Version corrigée\s*:\s*/i, ''), editedBy: by });
     // L'avis ne compte que s'il vient du lecteur (ou, faute de lecteur, de quelqu'un d'autre que le maire).
-    const hasReader = Object.values(this.world.agents).some((a) => a.role === 'LECTEUR');
-    const fromReader = hasReader ? this.agent(by)?.role === 'LECTEUR' : by !== this.world.mayorId;
+    const fromReader = by === gazetteStaff(this.world).LECTEUR;
     if (msg.kind === 'review' && fromReader) {
       const raw = msg.body.match(/(\d+(?:[.,]\d+)?)\s*(?:\/|sur)\s*5\b/)?.[1];
       const score = raw ? Math.min(5, Number(raw.replace(',', '.'))) : 3;
@@ -519,6 +554,9 @@ export class Sim {
     this.life = new Life();
     this.daily = new Daily();
     this.economy = new Economy();
+    this.coveredNews.clear();
+    this.issueSince = null;
+    this.issuesToday = 0;
     this.journal.restart();
     clearNews();
     buildNetwork(this, { silent: true });

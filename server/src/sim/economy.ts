@@ -36,6 +36,8 @@ export class Economy {
   private present = new Set<AgentId>();
   /** Jours d'absence récents, par habitant. */
   private absences = new Map<AgentId, number[]>();
+  /** Payés ce soir (pour l'humeur envers le maire). */
+  readonly paidToday = new Set<AgentId>();
   /** Soirs d'affilée sans de quoi payer le moindre salaire, par lieu. */
   private brokeDays = new Map<string, number>();
   /** Pains offerts aujourd'hui, par boulangerie. */
@@ -216,6 +218,7 @@ export class Economy {
     const w = sim.world;
     this.trade(sim);
     this.produce(sim);
+    this.paidToday.clear();
     for (const wp of Object.values(w.workplaces)) {
       let unpaid = false;
       for (const id of wp.workers) {
@@ -225,6 +228,7 @@ export class Economy {
           wp.till -= a.job.wage;
           const inv = (a.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
           inv.pieces += a.job.wage;
+          this.paidToday.add(id);
         } else unpaid = true;
       }
       wp.unpaidDays = unpaid ? wp.unpaidDays + 1 : 0;

@@ -36,9 +36,9 @@ export function systemPrompt(agent: Agent, isMayor: boolean): string {
     `Tu es ${agent.name}, ${ROLE_LABEL[agent.role].toLowerCase()} d’un hameau de quelques habitants.`,
     '',
     'RÈGLE DU MONDE : on ne communique qu’en envoyant un messager à pied le long des routes. Un message vers ' +
-      'quelqu’un qui n’est pas ton voisin direct est relayé par d’autres habitants : c’est lent, et les relais le lisent. ' +
+      'quelqu’un d’éloigné doit parcourir plusieurs routes et passer les ponts : c’est lent. ' +
       'Si aucune route ne mène au destinataire, le message est perdu.',
-    'MISSION COMMUNE : produire chaque jour la gazette du village. C’est un petit journal plein d’anecdotes et de ' +
+    'MISSION COMMUNE : faire paraître la gazette du village quand il s’y passe quelque chose (pas de numéro les jours calmes). C’est un petit journal plein d’anecdotes et de ' +
       'rumeurs : on raconte, on ne prouve pas ; inutile de réclamer des chiffres ou des preuves, et personne ne bloque la parution.',
     `TON RÔLE : ${DUTIES[agent.role]}`,
     isMayor && agent.role !== 'MAIRE' ? `TU ES AUSSI LE MAIRE ÉLU : ${DUTIES.MAIRE}` : '',
@@ -62,7 +62,8 @@ export type Trigger =
   | { type: 'day' }
   | { type: 'message'; msg: Message }
   | { type: 'inject'; text: string }
-  | { type: 'deadline' };
+  | { type: 'deadline' }
+  | { type: 'news'; text: string };
 
 function villageTime(w: WorldState) {
   const h = villageHour(w.clock.tick, w.clock.ticksPerDay);
@@ -181,15 +182,13 @@ function context(w: WorldState, agent: Agent, skipText?: string): string[] {
 export function situationPrompt(w: WorldState, agent: Agent, trigger: Trigger): string {
   const name = (id: string) => w.agents[id]?.name ?? id;
   let now: string;
-  if (trigger.type === 'day') now = 'Une nouvelle journée commence.';
-  else if (trigger.type === 'deadline')
-    now = `Il est ${villageTime(w)} et la gazette du jour n’est toujours pas parue. Si le dossier contient un texte, publie-le MAINTENANT (champ "publish"), même imparfait ; sinon relance ton équipe pour qu’elle te l’envoie vite.`;
+  if (trigger.type === 'day' || trigger.type === 'deadline') now = 'Une nouvelle journée commence.';
+  else if (trigger.type === 'news')
+    now = `Il est ${villageTime(w)} et il vient de se passer quelque chose qui mérite la gazette : « ${trigger.text} ». Lance un numéro : demande à l’éclaireur (ou fais-le toi-même s’il n’y en a pas) un article sur ce sujet.`;
   else if (trigger.type === 'inject') now = `Un événement imprévu secoue le village : ${trigger.text}`;
   else {
     const m = trigger.msg;
-    const origin = m.origin ?? m.from;
-    const via = origin !== m.from ? ` (relayé par ${name(m.from)})` : '';
-    now = `Tu viens de recevoir un message de ${name(origin)}${via} — ${KIND_LABEL[m.kind]} : « ${m.body} »`;
+    now = `Tu viens de recevoir un message de ${name(m.from)} — ${KIND_LABEL[m.kind]} : « ${m.body} »`;
   }
   const skip = trigger.type === 'message' ? trigger.msg.body : undefined;
   return [...context(w, agent, skip), '', `MAINTENANT : ${now}`, 'Que fais-tu ?'].filter(Boolean).join('\n');
