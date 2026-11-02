@@ -1,30 +1,22 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { SimEvent } from '@hameau/shared';
+import { MemoryJournal } from './memoryJournal';
 
-/** Journal append-only : en mémoire + fichier JSONL (une ligne par événement). */
-export class Journal {
-  readonly events: SimEvent[] = [];
-  private seq = 0;
-
+/** Journal append-only : en mémoire + fichier JSONL (une ligne par événement). Serveur Node seulement. */
+export class Journal extends MemoryJournal {
   constructor(private file: string) {
+    super();
     mkdirSync(dirname(file), { recursive: true });
   }
 
   /** Nouvelle partie : journal vide, dans un nouveau fichier du même dossier. */
-  restart() {
-    this.events.length = 0;
-    this.seq = 0;
+  override restart() {
+    super.restart();
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     this.file = join(dirname(this.file), `journal-${stamp}.jsonl`);
   }
 
-  append(e: Omit<SimEvent, 'seq' | 'at'>): SimEvent {
-    const line = JSON.stringify({ ...e, seq: ++this.seq, at: new Date().toISOString() });
-    // Copie figée : l'export montre l'état au moment de l'événement, pas l'état final du monde.
-    const event: SimEvent = JSON.parse(line);
-    this.events.push(event);
+  protected override persist(line: string) {
     appendFileSync(this.file, line + '\n');
-    return event;
   }
 }

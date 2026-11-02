@@ -1,13 +1,6 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-// .env à la racine du projet (facultatif). Les variables déjà définies l'emportent.
-const envFile = resolve(import.meta.dirname, '../../../.env');
-if (existsSync(envFile)) process.loadEnvFile(envFile);
+import { env } from '../env';
 
 export type ProviderName = 'mock';
-
-const env = process.env;
 
 export const LLM_CONFIG = {
   /** Appels comptés par jour (affichage de l'estimation ; aucun plafond en mode gratuit). */

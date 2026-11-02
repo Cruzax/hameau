@@ -1,15 +1,62 @@
-import { SERVER_PORT, type ClientToServer, type Message, type ServerToClient } from '@hameau/shared';
+import { SERVER_PORT, type ClientToServer, type Message, type ServerToClient, type SimEvent } from '@hameau/shared';
 import { appendEvents, useHameau } from './store';
+import type { WorkerReply, WorkerRequest } from './simWorker';
 
-export const SERVER_HTTP = `http://${location.hostname}:${SERVER_PORT}`;
+/** Par défaut, la simulation tourne dans le navigateur ; VITE_SERVER=1 pour utiliser le serveur Node local. */
+const USE_SERVER = import.meta.env.VITE_SERVER === '1';
+const SERVER_HTTP = `http://${location.hostname}:${SERVER_PORT}`;
 const SERVER_WS = `ws://${location.hostname}:${SERVER_PORT}`;
 
 const byId = (ms: Message[]) => Object.fromEntries(ms.map((m) => [m.id, m]));
 
 let reopenNow: (() => void) | null = null;
 
-/** Connexion WebSocket avec reconnexion automatique. Renvoie une fonction de nettoyage. */
+let worker: Worker | null = null;
+let journalWaiter: ((events: SimEvent[]) => void) | null = null;
+
+/** Se connecte à la simulation : dans le navigateur (par défaut) ou au serveur Node. Renvoie une fonction de nettoyage. */
 export function connect(): () => void {
+  return USE_SERVER ? connectServer() : connectWorker();
+}
+
+/** La simulation dans un fil du navigateur : pas de serveur, rien à installer. */
+function connectWorker(): () => void {
+  const w = new Worker(new URL('./simWorker.ts', import.meta.url), { type: 'module' });
+  worker = w;
+  w.onmessage = (ev: MessageEvent<WorkerReply>) => {
+    const msg = ev.data;
+    if (msg.type === 'journal') {
+      journalWaiter?.(msg.events);
+      journalWaiter = null;
+      return;
+    }
+    handle(msg);
+  };
+  useHameau.setState({ connected: true, send: (cmd: ClientToServer) => w.postMessage(cmd satisfies WorkerRequest) });
+  // Après un replay : on redemande l'état du monde (la simulation, elle, n'a jamais cessé de tourner).
+  reopenNow = () => w.postMessage({ type: 'snapshot.request' } satisfies WorkerRequest);
+  return () => {
+    w.terminate();
+    worker = null;
+    useHameau.setState({ connected: false, send: () => {} });
+  };
+}
+
+/** Tout le journal de la partie, pour le télécharger. */
+export async function fetchJournal(): Promise<SimEvent[]> {
+  if (worker) {
+    const w = worker;
+    return new Promise((resolve) => {
+      journalWaiter = resolve;
+      w.postMessage({ type: 'journal.request' } satisfies WorkerRequest);
+    });
+  }
+  const res = await fetch(`${SERVER_HTTP}/journal.json`);
+  return res.json();
+}
+
+/** Connexion WebSocket au serveur Node, avec reconnexion automatique. */
+function connectServer(): () => void {
   let ws: WebSocket | null = null;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let closed = false;

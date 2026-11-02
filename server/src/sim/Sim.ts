@@ -1,3 +1,4 @@
+import { env } from '../env';
 import {
   createFounderWorld,
   createSeedWorld,
@@ -18,7 +19,7 @@ import {
   type VoteSession,
   type WorldState,
 } from '@hameau/shared';
-import { Journal } from '../store/journal';
+import type { MemoryJournal } from '../store/memoryJournal';
 import { buildNetwork, neighbors, route } from './network';
 import { Politics } from './politics';
 import { Life } from './life';
@@ -83,7 +84,7 @@ export class Sim {
   private outbox: SimEvent[] = [];
   private agentsDirty = false;
   private llmDirty = false;
-  private timer: NodeJS.Timeout | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
   politics = new Politics();
   life = new Life();
   /** Vie quotidienne : besoins, métiers, déplacements, rumeurs, justice. */
@@ -91,12 +92,12 @@ export class Sim {
   /** Emplois, salaires, lieux de travail. */
   economy = new Economy();
   /** Vie du village (couples, naissances, constructions…). Désactivable avec LIFE_ENABLED=false. */
-  lifeEnabled = process.env.LIFE_ENABLED !== 'false';
+  lifeEnabled = env.LIFE_ENABLED !== 'false';
   private nextMsgId = 1;
 
   constructor(
     readonly brain: Brain,
-    readonly journal: Journal,
+    readonly journal: MemoryJournal,
     private readonly broadcast: (msg: ServerToClient) => void,
   ) {
     // Le monde de départ n'a que la place et les ponts : on y raccorde les maisons, sans bruit.

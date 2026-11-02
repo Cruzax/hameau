@@ -1,14 +1,24 @@
 import { useState } from 'react';
 import { ROLE_COLOR, type SimEvent } from '@hameau/shared';
 import { useHameau } from '../net/store';
-import { SERVER_HTTP } from '../net/socket';
+import { fetchJournal } from '../net/socket';
 import { replayFile, startReplay } from '../net/replay';
 import { Panel } from './Panel';
 
-/** Rejoue depuis un événement : on récupère le journal complet du serveur. */
+/** Rejoue depuis un événement : on récupère le journal complet de la partie. */
 async function replayFrom(seq: number) {
-  const res = await fetch(`${SERVER_HTTP}/journal.json`);
-  startReplay((await res.json()) as SimEvent[], seq);
+  startReplay(await fetchJournal(), seq);
+}
+
+/** Télécharge le journal de la partie en JSON. */
+async function downloadJournal() {
+  const events = await fetchJournal();
+  const url = URL.createObjectURL(new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hameau-journal-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Lignes masquées par défaut (case « tout ») : trop fréquentes pour être lues. */
@@ -35,9 +45,9 @@ export function Journal() {
           <label className="chip" title="Afficher aussi les livraisons et les appels à l’IA">
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> tout
           </label>
-          <a className={`chip chip--dark ${connected ? '' : 'is-disabled'}`} href={`${SERVER_HTTP}/journal.json`} title="Télécharger le journal (script des vidéos)">
+          <button className={`chip chip--dark ${connected ? '' : 'is-disabled'}`} onClick={() => void downloadJournal()} title="Télécharger le journal de la partie">
             ⬇ JSON
-          </a>
+          </button>
           <label className="chip" title="Rejouer un journal exporté">
             📂
             <input type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && replayFile(e.target.files[0])} />

@@ -1,3 +1,4 @@
+import './loadEnv';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';

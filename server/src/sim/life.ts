@@ -1,3 +1,4 @@
+import { env } from '../env';
 import { attracted, isDwelling, mulberry32, randomOrientation, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode, neighbors } from './network';
@@ -7,7 +8,7 @@ import { WAGES } from './economyConfig';
 // Vie du village : le monde évolue tout seul, chaque soir, selon les relations entre habitants.
 // Règles simples et gratuites (aucun appel LLM) ; les agents en sont informés par leur mémoire.
 
-const MAX_POPULATION = Number(process.env.MAX_POPULATION ?? 50);
+const MAX_POPULATION = Number(env.MAX_POPULATION ?? 50);
 const COUPLE_OPINION = 0.4;       // estime mutuelle minimale pour se mettre en couple…
 const COUPLE_DAYS = 2;            // …pendant ce nombre de soirs d'affilée
 const SPLIT_OPINION = 0.05;       // en dessous, le couple se sépare
