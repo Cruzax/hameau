@@ -28,7 +28,9 @@ import { CRIER_EXTRAS, SONGS } from '../content/verses';
 
 const WALK_SPEED = 0.7;           // unités de monde par tick (un peu plus vite qu'un messager chargé)
 const DECIDE_EVERY = 12;          // chaque habitant réfléchit à son emploi du temps tous les N ticks
-const MEET_EVERY = 14;            // une conversation par lieu fréquenté, tous les N ticks
+const MEET_EVERY = 14;            // une conversation par lieu fréquenté, tous les N ticks en moyenne
+/** Délai avant la réponse (ticks) : les répliques s'affichent chacune à leur tour. */
+const REPLY_DELAY = 6;
 const NEEDS_PATCH_EVERY = 8;      // fréquence d'envoi des besoins au site
 const TAX_THRESHOLD = 6;          // au-delà de cette somme, on paie une pièce d'impôt chaque matin
 const CARE_PRICE = 2;
@@ -166,6 +168,8 @@ export class Daily {
     return true;
   }
   private stays = new Map<AgentId, number>();
+  /** Réponses qui attendent leur tour dans une conversation en cours. */
+  private replies: { due: number; speaker: AgentId; listener: AgentId; text: string; place: PlaceId }[] = [];
 
   private placeName(sim: Sim, place: PlaceId) {
     if (place === 'place') return 'la place';
@@ -227,7 +231,8 @@ export class Daily {
       if ((sim.clock.tick + i * 3) % DECIDE_EVERY === 0) this.decide(sim, a, hour, night);
     }
 
-    if (sim.clock.tick % MEET_EVERY === 0) this.meetings(sim);
+    this.deliverReplies(sim);
+    this.meetings(sim);
     if (this.at(sim, 20)) this.tavernSong(sim);
     this.justice.onTick(sim, hour, this.byRole(sim, 'GARDE')?.id);
 
@@ -584,9 +589,28 @@ export class Daily {
   }
 
   /** Deux personnes au même endroit se parlent : rumeurs, petites phrases, disputes. */
+  /** Les réponses en attente, dites quand leur tour vient (si l'autre est toujours là). */
+  private deliverReplies(sim: Sim) {
+    const due = this.replies.filter((r) => sim.clock.tick >= r.due);
+    if (!due.length) return;
+    this.replies = this.replies.filter((r) => sim.clock.tick < r.due);
+    for (const r of due) {
+      const [speaker, listener] = [sim.agent(r.speaker), sim.agent(r.listener)];
+      if (!speaker || !listener || this.placeOf(speaker) !== r.place || this.placeOf(listener) !== r.place) continue;
+      sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} répond : « ${r.text} »`, { body: r.text, place: r.place });
+      sim.remember(listener.id, speaker.id, 'in', r.text);
+    }
+  }
+
+  /**
+   * Les conversations : chaque lieu a sa chance à chaque tick (une tous les MEET_EVERY ticks en moyenne),
+   * pour qu'elles s'étalent au lieu de partir toutes en même temps. Qui attend une réponse ne lance rien.
+   */
   private meetings(sim: Sim) {
-    for (const [place, people] of this.presence(sim)) {
-      if (people.length < 2) continue;
+    const busy = new Set(this.replies.flatMap((r) => [r.speaker, r.listener]));
+    for (const [place, all] of this.presence(sim)) {
+      const people = all.filter((a) => !busy.has(a.id));
+      if (people.length < 2 || Math.random() >= 1 / MEET_EVERY) continue;
       const i = Math.floor(Math.random() * people.length);
       const speaker = people[i];
       const listener = people[(i + 1 + Math.floor(Math.random() * (people.length - 1))) % people.length];
@@ -613,11 +637,8 @@ export class Daily {
         sim.adjustOpinion(speaker.id, listener.id, ex.bond);
         sim.adjustOpinion(listener.id, speaker.id, ex.bond);
         if (ex.reply) {
-          sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} à ${listener.name} (${where}) : « ${line} »`, { body: line, place });
-          line = '';
-          sim.emit('life.meet', [listener.id, speaker.id], `🗨 ${listener.name} répond : « ${ex.reply} »`, { body: ex.reply, place });
-          sim.remember(listener.id, speaker.id, 'in', ex.line);
-          continue;
+          // La réponse viendra un peu plus tard, quand la première bulle aura été lue.
+          this.replies.push({ due: sim.clock.tick + REPLY_DELAY + Math.floor(Math.random() * 3), speaker: listener.id, listener: speaker.id, text: ex.reply, place });
         }
       }
       sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} à ${listener.name} (${where}) : « ${line} »`, { body: line, place });

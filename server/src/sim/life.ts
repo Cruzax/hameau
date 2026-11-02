@@ -5,6 +5,7 @@ import { connectNode, neighbors } from './network';
 import { newHouse, slug } from './god';
 import { NAMES_BY_SEX } from '@hameau/shared';
 import { WAGES } from './economyConfig';
+import { isAdult } from './economy';
 
 // Vie du village : le monde évolue tout seul, chaque soir, selon les relations entre habitants.
 // Règles simples et gratuites (aucun appel LLM) ; les agents en sont informés par leur mémoire.
@@ -18,6 +19,14 @@ const BIRTH_CHANCE = 0.15;
 const ADULT_AFTER_DAYS = 7;       // un enfant construit sa maison au bout de ces jours
 const NEWCOMER_CHANCE = 0.3;
 const LEAVE_CHANCE = 0.3;
+/** Sans travail et sans le sou ce nombre de soirs d'affilée : on part tenter sa chance ailleurs. */
+const BROKE_LEAVE_DAYS = 2;
+const BROKE_LEAVE_CHANCE = 0.5;
+/** « Sans le sou » : moins que le prix de quelques pains… */
+const BROKE_PIECES = 3;
+/** …ou, dans un village presque plein où le travail manque, trop peu pour voir venir. */
+const CROWDED = 0.8;
+const CROWDED_BROKE_PIECES = 12;
 
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
 
@@ -38,6 +47,8 @@ export class Life {
   /** Jour de formation des couples. */
   private coupledSince = new Map<string, number>();
   private isolatedDays = new Map<AgentId, number>();
+  /** Soirs d'affilée sans travail ni argent, par habitant. */
+  private brokeDays = new Map<AgentId, number>();
   /** Tous les prénoms déjà portés au village, même par ceux qui sont partis : jamais deux fois le même. */
   private usedNames = new Set<string>();
 
@@ -235,6 +246,8 @@ export class Life {
   private departures(sim: Sim) {
     const w = sim.world;
     if (Object.keys(w.agents).length <= 4) return;
+    this.brokeDepartures(sim);
+    if (Object.keys(w.agents).length <= 4) return;
     for (const a of Object.values(w.agents)) {
       const isolated = neighbors(w, a.id).length === 0 && !Object.values(w.agents).some((x) => x.id !== a.id && x.houseId === a.houseId);
       const days = isolated ? (this.isolatedDays.get(a.id) ?? 0) + 1 : 0;
@@ -254,6 +267,50 @@ export class Life {
       sim.broadcastPatch({ houses: w.houses });
       sim.touchAgents();
       return; // un départ par soir au plus
+    }
+  }
+
+  /**
+   * Plus un sou et pas de travail depuis quelques soirs : on fait son baluchon. Les célibataires sans enfant
+   * à charge partent seuls ; un couple part ensemble si les deux sont fauchés. Au plus un foyer par soir.
+   */
+  private brokeDepartures(sim: Sim) {
+    const w = sim.world;
+    const crowded = Object.keys(w.agents).length >= MAX_POPULATION * CROWDED;
+    const limit = crowded ? CROWDED_BROKE_PIECES : BROKE_PIECES;
+    const broke = (a: Agent) => isAdult(w, a) && !a.job && (a.inventory?.pieces ?? 0) < limit;
+    for (const a of Object.values(w.agents)) this.brokeDays.set(a.id, broke(a) ? (this.brokeDays.get(a.id) ?? 0) + 1 : 0);
+    for (const id of [...this.brokeDays.keys()]) if (!w.agents[id]) this.brokeDays.delete(id);
+    for (const a of Object.values(w.agents)) {
+      if ((this.brokeDays.get(a.id) ?? 0) < BROKE_LEAVE_DAYS || a.id === w.mayorId || this.rand() > BROKE_LEAVE_CHANCE) continue;
+      const partner = a.family?.partnerId ? w.agents[a.family.partnerId] : undefined;
+      if (partner && (!broke(partner) || partner.id === w.mayorId)) continue; // l'autre fait vivre le foyer
+      const leaving = [a, ...(partner ? [partner] : [])];
+      // Les enfants encore à la maison suivent leurs parents.
+      const kids = leaving.flatMap((p) => p.family?.childIds ?? []).map((k) => w.agents[k]).filter((k): k is Agent => !!k && !isAdult(w, k));
+      const all = [...new Set([...leaving, ...kids])];
+      if (Object.keys(w.agents).length - all.length < 4) return;
+      for (const x of all) this.leave(sim, x);
+      const names = leaving.map((x) => x.name).join(' et ');
+      const withKids = kids.length ? `, avec ${kids.length > 1 ? 'les enfants' : kids[0].name}` : '';
+      sim.emit('agent.left', all.map((x) => x.id),
+        `🧳 Plus un sou et pas de travail : ${names} ${leaving.length > 1 ? 'partent tenter leur' : 'part tenter sa'} chance ailleurs${withKids}.`, { agentId: a.id, broke: true });
+      sim.broadcastPatch({ houses: w.houses });
+      sim.touchAgents();
+      return;
+    }
+  }
+
+  /** Retire un habitant du village (sa maison se libère, on oublie ce qu'on pensait de lui). */
+  private leave(sim: Sim, a: Agent) {
+    const w = sim.world;
+    delete w.agents[a.id];
+    const house = w.houses[a.houseId];
+    if (house?.ownerId === a.id) house.ownerId = null;
+    for (const o of Object.values(w.agents)) {
+      delete o.opinions[a.id];
+      if (o.family?.partnerId === a.id) delete o.family.partnerId;
+      if (o.lodging === a.houseId && !Object.values(w.agents).some((x) => x.houseId === a.houseId)) delete o.lodging;
     }
   }
 

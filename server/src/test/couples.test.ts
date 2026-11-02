@@ -43,3 +43,20 @@ test('un couple de même sexe adopte un enfant', () => {
   const child = Object.values(sim.world.agents).find((a) => a.family?.parentIds.includes(x.id))!;
   assert.ok(child.sex === 'M' || child.sex === 'F');
 });
+
+test('sans travail ni argent plusieurs soirs, on finit par partir', () => {
+  const sim = newSim();
+  const w = sim.world;
+  const poor = Object.values(w.agents).find((a) => a.id !== w.mayorId && !a.family?.partnerId)!;
+  const before = Object.keys(w.agents).length;
+  let gone = false;
+  for (let d = 0; d < 30 && !gone; d++) {
+    poor.inventory = { pain: 0, bois: 0, outils: 0, pieces: 0 };
+    delete poor.job;
+    (sim.life as unknown as { brokeDepartures(s: unknown): void }).brokeDepartures(sim);
+    gone = !w.agents[poor.id];
+  }
+  assert.ok(gone, 'personne ne part');
+  assert.ok(Object.keys(w.agents).length < before);
+  assert.ok(sim.journal.events.some((e) => e.type === 'agent.left' && /tenter sa chance/.test(e.text)));
+});
