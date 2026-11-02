@@ -1,4 +1,5 @@
 import { facing } from './geometry';
+import { autoRoles, personalityFromTraits, randomOrientation, type FounderSpec } from './traits';
 import type { Agent, AgentId, House, Inventory, Road, Role, Terrain, Vec2, WorldState } from './types';
 
 const PLAZA: Vec2 = { x: 0, z: 0 };
@@ -214,4 +215,47 @@ export function createSeedWorld(preset: VillagePreset = 'complet'): WorldState {
 /** Une maison où l'on peut habiter (ni lieu de travail, ni carrefour). */
 export function isDwelling(h: House): boolean {
   return (h.kind ?? 'maison') === 'maison';
+}
+
+// ─── Nouvelle histoire : 4 fondateurs composés par l'utilisateur ─────────────
+
+const FOUNDER_SPOTS: Vec2[] = [{ x: -10, z: -6 }, { x: -11, z: 6 }, { x: -2, z: -12 }, { x: -1, z: 12 }];
+const FOUNDER_STYLES: House['style'][] = ['chaumiere', 'atelier', 'chaumiere', 'cabane'];
+const FOUNDER_COLORS: [string, string][] = [['#f3e3c3', '#c0573e'], ['#e8d2a8', '#3f7a6b'], ['#f1d9b5', '#8a5a9e'], ['#efe0c8', '#2f5d8a']];
+
+
+/** Monde de départ d'une histoire choisie : 4 maisons, une ferme et une boulangerie du village, la place et les ponts. */
+export function createFounderWorld(founders: FounderSpec[], rand: () => number = Math.random): WorldState {
+  const roles = autoRoles(founders);
+  const ids = founders.map((f, i) => f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `habitant-${i}`);
+  const agents = founders.map((f, i) => {
+    const a = agent(ids[i], f.name.trim(), roles[i], personalityFromTraits(f.traits), []);
+    a.sex = f.sex && f.sex !== 'auto' ? f.sex : rand() < 0.5 ? 'M' : 'F';
+    a.orientation = f.orientation && f.orientation !== 'auto' ? f.orientation : randomOrientation(rand());
+    a.goals = roles[i] === 'MAIRE' ? ['Rester maire', 'Que le village prospère'] : ['Gagner sa vie', 'Trouver sa place au village'];
+    for (const other of ids) if (other !== ids[i]) a.opinions[other] = 0.2;
+    return a;
+  });
+  const houses = founders.map((_, i) => {
+    const h = house(`h-${ids[i]}`, ids[i], FOUNDER_SPOTS[i], FOUNDER_STYLES[i], FOUNDER_COLORS[i][0], FOUNDER_COLORS[i][1]);
+    return h;
+  });
+  const work = (id: string, style: House['style'], position: Vec2): House =>
+    ({ id, ownerId: null, kind: 'travail', position, rotation: facing(position, PLAZA), style, wallColor: '#ecdcbc', roofColor: '#8a4a2a' });
+  const bakery = work('w-boulangerie', 'boulangerie', { x: -17, z: -1 });
+  const farm = work('w-ferme', 'ferme', { x: -22, z: -16 });
+  const workplaces: WorldState['workplaces'] = {
+    'wp-boulangerie': { id: 'wp-boulangerie', kind: 'boulangerie', era: 'ancienne', houseId: bakery.id, ownerId: null, slots: 2, workers: [], till: 40, stock: { pain: 12 }, unpaidDays: 0, openedDay: 1 },
+    'wp-ferme': { id: 'wp-ferme', kind: 'ferme', era: 'ancienne', houseId: farm.id, ownerId: null, slots: 4, workers: [], till: 40, stock: {}, unpaidDays: 0, openedDay: 1 },
+  };
+  const ai = founders.findIndex((f) => f.ai);
+  return {
+    ...createSeedWorld('origine'),
+    mayorId: ids[roles.indexOf('MAIRE')] ?? ids[0],
+    agents: byId(agents),
+    houses: byId([...houses, bakery, farm, ...structuredClone(NETWORK_NODES)]),
+    roads: byId(structuredClone(NETWORK_ROADS)),
+    workplaces,
+    ...(ai >= 0 ? { aiAgentId: ids[ai] } : {}),
+  };
 }

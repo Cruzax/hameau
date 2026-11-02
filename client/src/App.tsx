@@ -7,6 +7,7 @@ import { Village } from './scene/Village';
 import { TitleBanner } from './ui/TitleBanner';
 import { Controls } from './ui/Controls';
 import { VotePanel } from './ui/VotePanel';
+import { StartScreen } from './ui/StartScreen';
 import { GodPanel } from './ui/GodPanel';
 import { Sidebar } from './ui/Sidebar';
 import { GazettePanel, Journal } from './ui/Journal';
@@ -95,6 +96,7 @@ export default function App() {
           <Habitants />
           <Relations />
           <GodPanel />
+          <StartScreen />
         </>
       )}
       {capture && <CaptureBar />}

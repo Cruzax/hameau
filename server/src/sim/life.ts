@@ -1,4 +1,4 @@
-import { isDwelling, mulberry32, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
+import { attracted, isDwelling, mulberry32, randomOrientation, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode, neighbors } from './network';
 import { newHouse, slug } from './god';
@@ -76,6 +76,7 @@ export class Life {
           continue;
         }
         if (a.family?.partnerId || b.family?.partnerId || this.related(a, b)) continue;
+        if (!attracted(a, b) || !attracted(b, a)) continue;
         const streak = mutual >= COUPLE_OPINION ? (this.affinity.get(k) ?? 0) + 1 : 0;
         this.affinity.set(k, streak);
         if (streak >= COUPLE_DAYS) this.pair(sim, a, b);
@@ -152,6 +153,8 @@ export class Life {
       lastActionTick: sim.clock.tick,
       bornDay: sim.clock.day,
       family: { parentIds: [a.id, b.id], childIds: [] },
+      sex: this.rand() < 0.5 ? 'M' : 'F',
+      orientation: randomOrientation(this.rand()),
     };
     for (const other of Object.values(w.agents)) {
       const parent = other.id === a.id || other.id === b.id;
@@ -161,7 +164,11 @@ export class Life {
     w.agents[id] = child;
     this.family(a).childIds.push(id);
     this.family(b).childIds.push(id);
-    sim.emit('agent.born', [id, a.id, b.id], `👶 Naissance de ${name} chez ${a.name} et ${b.name} !`, { agentId: id, agent: child });
+    // Un couple de même sexe adopte ; sinon, c'est une naissance.
+    const adopted = !!a.sex && a.sex === b.sex;
+    sim.emit('agent.born', [id, a.id, b.id], adopted
+      ? `🏡 ${a.name} et ${b.name} adoptent ${name} !`
+      : `👶 Naissance de ${name} chez ${a.name} et ${b.name} !`, { agentId: id, agent: child, adopted });
     sim.daily.scheduleParty(sim, `on fête la naissance de ${name}`);
     sim.touchAgents();
   }
@@ -254,6 +261,8 @@ export class Life {
         ambition: this.rand(),
       },
       goals: role === 'MENTEUR' ? ['Semer la zizanie sans se faire prendre'] : ['Se faire accepter au village'],
+      sex: this.rand() < 0.5 ? 'M' : 'F',
+      orientation: randomOrientation(this.rand()),
       memory: { short: [], long: '' },
       opinions: {},
       inbox: [],

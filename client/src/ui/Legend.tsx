@@ -53,6 +53,7 @@ export function Habitants() {
               <span className="person__name">{a.name}</span>
               <span className="person__role">{ROLE_LABEL[a.role]}</span>
               <span className="person__tags">
+                {a.sex && <span title={`${a.sex === 'M' ? 'Masculin' : 'Féminin'} · ${{ hetero: 'hétéro', bi: 'bi', gay: 'gay' }[a.orientation ?? 'hetero']}`}>{a.sex === 'M' ? '♂' : '♀'}</span>}
                 {mayorId === a.id && <span title="Maire">👑</span>}
                 {a.family?.partnerId && agents[a.family.partnerId] && <span title={`En couple avec ${agents[a.family.partnerId].name}`}>💞</span>}
                 {a.family?.parentIds.length ? <span title="Enfant du village">👶</span> : null}

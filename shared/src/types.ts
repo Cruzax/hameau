@@ -105,6 +105,9 @@ export interface Agent {
   inventory?: Inventory;
   location?: AgentLocation;
   asleep?: boolean;
+  /** Sexe et orientation (couples, enfants). Absents chez les anciens habitants. */
+  sex?: 'M' | 'F';
+  orientation?: 'hetero' | 'bi' | 'gay';
   /** Emploi actuel, s'il en a un. */
   job?: { workplaceId: string; since: number; wage: number };
 }
@@ -345,6 +348,8 @@ export interface WorldState {
   agents: Record<AgentId, Agent>;
   houses: Record<HouseId, House>;
   roads: Record<RoadId, Road>;
+  /** Le seul villageois piloté par l'IA, s'il y en a un. */
+  aiAgentId?: AgentId;
   /** Lieux de travail (fermes, moulins, scieries…), rattachés à un nœud de `houses`. */
   workplaces: Record<string, Workplace>;
   messages: Record<MessageId, Message>;

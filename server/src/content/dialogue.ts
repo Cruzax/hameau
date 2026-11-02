@@ -1,4 +1,4 @@
-import type { Agent, Role } from '@hameau/shared';
+import { attracted, type Agent, type Role } from '@hameau/shared';
 
 // Répliques écrites à la main, choisies selon le métier, l'humeur et la situation.
 // Pour enrichir le village : ajouter des lignes ici, aucune autre modification n'est nécessaire.
@@ -179,7 +179,7 @@ export function chooseExchange(c: TalkContext): Exchange {
   const partners = c.speaker.family?.partnerId === c.listener.id;
   // On ne flirte qu'avec son partenaire, ou entre célibataires sans lien de famille.
   const single = (x: Agent) => !x.family?.partnerId;
-  const mayFlirt = partners || (c.mutual > 0.6 && single(c.speaker) && single(c.listener) && !kin(c.speaker, c.listener));
+  const mayFlirt = partners || (c.mutual > 0.6 && single(c.speaker) && single(c.listener) && !kin(c.speaker, c.listener) && attracted(c.speaker, c.listener) && attracted(c.listener, c.speaker));
   if ((partners || c.mutual > 0.55) && Math.random() < 0.5) {
     const [line, reply] = pick(mayFlirt ? FLIRT : FRIENDLY);
     return { line, reply, bond: 0.05 };

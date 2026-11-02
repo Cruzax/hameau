@@ -1,5 +1,8 @@
 import {
+  createFounderWorld,
   createSeedWorld,
+  validateFounders,
+  type FounderSpec,
   dayFraction,
   type VillagePreset,
   roadLength,
@@ -474,9 +477,15 @@ export class Sim {
       case 'god.vote.force':
         if (!this.politics.current(this)) this.politics.open(this, true);
         break;
-      case 'god.reset':
-        this.reset(c.preset);
+      case 'god.reset': {
+        const error = c.founders && validateFounders(c.founders);
+        if (error) {
+          this.emit('god.inject', [], `⚠️ Impossible de lancer l’histoire : ${error}`);
+          return;
+        }
+        this.reset(c.founders ? { founders: c.founders } : c.preset ?? 'origine');
         return;
+      }
       case 'god.opinion':
         this.adjustOpinion(c.who, c.about, c.delta, c.delta < 0 ? 'Une petite voix me souffle de m’en méfier…' : 'Une petite voix me dit de lui faire confiance.');
         break;
@@ -491,8 +500,9 @@ export class Sim {
    * Histoire vierge : village de départ (complet ou d'origine), jour 1 à 6 h, journal neuf.
    * Le choix de l'IA et ses garde-fous sont conservés ; les compteurs repartent à zéro.
    */
-  reset(preset: VillagePreset) {
-    const fresh = createSeedWorld(preset);
+  reset(start: VillagePreset | { founders: FounderSpec[] }) {
+    const preset = typeof start === 'string' ? start : 'fondateurs';
+    const fresh = typeof start === 'string' ? createSeedWorld(start) : createFounderWorld(start.founders);
     const llm = this.world.llm;
     const voteEveryDays = this.world.voteEveryDays;
     const speed = this.clock.speed;
@@ -513,9 +523,11 @@ export class Sim {
     clearNews();
     buildNetwork(this, { silent: true });
     this.broadcast({ type: 'snapshot', world: this.world, events: [] });
+    const founders = Object.values(this.world.agents).map((a) => a.name);
     this.emit('god.inject', [], preset === 'origine'
       ? '🔄 Nouvelle histoire : le hameau d’origine, ses cinq habitants et sa gazette.'
-      : '🔄 Nouvelle histoire : le village au complet.', { reset: preset });
+      : preset === 'complet' ? '🔄 Nouvelle histoire : le village au complet.'
+      : `🔄 Nouvelle histoire : ${founders.slice(0, -1).join(', ')} et ${founders.at(-1)} fondent le village.`, { reset: preset });
     // Le journal repart de zéro : on y note quel cerveau anime les agents.
     this.emit('llm.config', [], `🧠 Cerveau des agents : ${llm.provider === 'mock' ? 'gratuit (réponses scriptées)' : `${llm.provider} · ${llm.model ?? '?'}`}.`, {
       provider: llm.provider, model: llm.model, ok: true,
