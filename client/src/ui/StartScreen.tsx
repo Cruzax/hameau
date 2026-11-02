@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  MAX_TRAITS, PROFILES, ROLE_LABEL, TRAITS, validateFounders,
+  MAX_TRAITS, NAMES_BY_SEX, PROFILES, ROLE_LABEL, TRAITS, sexOfName, validateFounders,
   type FounderSpec, type Orientation, type Role, type Sex, type TraitId,
 } from '@hameau/shared';
 import { useHameau } from '../net/store';
@@ -12,11 +12,14 @@ const ROLES: (Role | 'auto')[] = ['auto', 'MAIRE', 'ECLAIREUR', 'ECRIVAIN', 'EDI
 const NAMES = ['Maxence', 'Lina', 'Félix', 'Rose', 'Gabin', 'Jade', 'Hugo', 'Emma', 'Sacha', 'Alba', 'Malo', 'Nina', 'Théo', 'Zoé', 'Lucas', 'Chloé'];
 const pick = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)];
 
-const blank = (i: number): FounderSpec => ({ name: NAMES[i], traits: [], role: 'auto', sex: 'auto', orientation: 'auto' });
+const blank = (i: number): FounderSpec => ({ name: NAMES[i], traits: [], role: 'auto', sex: sexOfName(NAMES[i]) ?? 'auto', orientation: 'auto' });
 
+/** Un fondateur tiré au sort : le sexe d'abord, puis un prénom qui va avec. */
 function randomFounder(taken: string[]): FounderSpec {
   const profile = pick(PROFILES);
-  return { name: pick(NAMES.filter((n) => !taken.includes(n))), traits: [...profile.traits], role: 'auto', sex: 'auto', orientation: 'auto' };
+  const sex: Sex = Math.random() < 0.5 ? 'M' : 'F';
+  const name = pick([...NAMES_BY_SEX[sex], ...NAMES_BY_SEX.X].filter((n) => !taken.includes(n)));
+  return { name, traits: [...profile.traits], role: 'auto', sex, orientation: 'auto' };
 }
 
 export function StartScreen() {

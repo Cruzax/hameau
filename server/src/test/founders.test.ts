@@ -64,3 +64,14 @@ test('deux fondateurs dont les noms ne diffèrent que par les accents sont refus
   const err = validateFounders([{ name: 'Zoé', traits: [], role: 'auto' }, { name: 'Zoe', traits: [], role: 'auto' }]);
   assert.match(err ?? '', /même nom/);
 });
+
+test('sexe « au hasard » : un prénom connu donne le sexe qui va avec', () => {
+  const w = createFounderWorld([
+    { name: 'Lucas', traits: [], role: 'auto', sex: 'auto' },
+    { name: 'Chloé', traits: [], role: 'auto', sex: 'auto' },
+    { name: 'Greg', traits: [], role: 'auto' },
+    { name: 'Melissa', traits: [], role: 'auto', sex: 'auto' },
+  ]);
+  const sex = Object.fromEntries(Object.values(w.agents).map((a) => [a.name, a.sex]));
+  assert.deepEqual(sex, { Lucas: 'M', Chloé: 'F', Greg: 'M', Melissa: 'F' });
+});

@@ -1,6 +1,7 @@
 import { facing } from './geometry';
 import { autoRoles, founderId, personalityFromTraits, randomOrientation, type FounderSpec } from './traits';
 import type { Agent, AgentId, House, Inventory, Road, Role, Terrain, Vec2, WorldState } from './types';
+import { sexOfName } from './names';
 
 const PLAZA: Vec2 = { x: 0, z: 0 };
 
@@ -230,7 +231,7 @@ export function createFounderWorld(founders: FounderSpec[], rand: () => number =
   const ids = founders.map((f, i) => founderId(f.name) || `habitant-${i}`);
   const agents = founders.map((f, i) => {
     const a = agent(ids[i], f.name.trim(), roles[i], personalityFromTraits(f.traits), []);
-    a.sex = f.sex && f.sex !== 'auto' ? f.sex : rand() < 0.5 ? 'M' : 'F';
+    a.sex = f.sex && f.sex !== 'auto' ? f.sex : sexOfName(f.name) ?? (rand() < 0.5 ? 'M' : 'F');
     a.orientation = f.orientation && f.orientation !== 'auto' ? f.orientation : randomOrientation(rand());
     a.goals = roles[i] === 'MAIRE' ? ['Rester maire', 'Que le village prospère'] : ['Gagner sa vie', 'Trouver sa place au village'];
     for (const other of ids) if (other !== ids[i]) a.opinions[other] = 0.2;

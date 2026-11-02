@@ -3,6 +3,7 @@ import { attracted, isDwelling, mulberry32, randomOrientation, ROLE_LABEL, type 
 import type { Sim } from './Sim';
 import { connectNode, neighbors } from './network';
 import { newHouse, slug } from './god';
+import { NAMES_BY_SEX } from '@hameau/shared';
 import { WAGES } from './economyConfig';
 
 // Vie du village : le monde évolue tout seul, chaque soir, selon les relations entre habitants.
@@ -18,23 +19,6 @@ const ADULT_AFTER_DAYS = 7;       // un enfant construit sa maison au bout de ce
 const NEWCOMER_CHANCE = 0.3;
 const LEAVE_CHANCE = 0.3;
 
-/** Prénoms selon le sexe ; les prénoms mixtes vont à tout le monde. */
-const NAMES: Record<'M' | 'F' | 'X', string[]> = {
-  F: [
-    'Léa', 'Jade', 'Chloé', 'Emma', 'Zoé', 'Lina', 'Rose', 'Nina', 'Alba', 'Inès', 'Manon', 'Margaux', 'Alice', 'Elsa', 'Iris', 'Louise', 'Anna',
-    'Clara', 'Juliette', 'Maëlle', 'Agathe', 'Romane', 'Mila', 'Capucine', 'Suzanne', 'Héloïse', 'Apolline', 'Éloïse', 'Margot', 'Bérénice', 'Colette',
-    'Odile', 'Mathilde', 'Blanche', 'Jeanne', 'Lucie', 'Adèle', 'Constance', 'Albane', 'Philippine', 'Sixtine', 'Garance', 'Ysée', 'Aurore', 'Fleur',
-    'Hortense', 'Joséphine', 'Livia', 'Noémie', 'Salomé', 'Lou-Ann', 'Céleste', 'Melissa',
-  ],
-  M: [
-    'Hugo', 'Nathan', 'Lucas', 'Tom', 'Noah', 'Gabin', 'Malo', 'Théo', 'Louis', 'Jules', 'Arthur', 'Paul', 'Victor', 'Raphaël', 'Adam', 'Martin',
-    'Simon', 'Basile', 'Émile', 'Léon', 'Oscar', 'Marius', 'Félix', 'Gaspard', 'Augustin', 'Barnabé', 'Lazare', 'Célestin', 'Achille', 'Aimé',
-    'Ernest', 'Firmin', 'Gaston', 'Hector', 'Ambroise', 'Clovis', 'Anatole', 'Eugène', 'Fernand', 'Octave', 'Valentin', 'Edgar', 'Honoré', 'Joseph',
-    'Bastien', 'Dorian', 'Gauthier', 'Ilan', 'Kylian', 'Mathis', 'Pierre', 'Tristan', 'Élie', 'Maxime',
-    'Adrien', 'Cyril', 'Gaudard', 'Greg', 'Remi', 'Tony',
-  ],
-  X: ['Sacha', 'Camille', 'Lou', 'Ange', 'Charlie', 'Morgan', 'Alix', 'Eden', 'Andréa', 'Dominique', 'Claude', 'Noa', 'Yaël', 'Swann'],
-};
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
 
 /** Où bâtir une maison neuve : près d'un lieu de travail qui embauche (les quartiers se forment), sinon près de la place. */
@@ -73,10 +57,10 @@ export class Life {
   /** Un prénom qui va avec le sexe et que personne n'a jamais porté ici ; si la liste est épuisée, un prénom composé. */
   private freshName(sim: Sim, sex: 'M' | 'F'): string {
     for (const a of Object.values(sim.world.agents)) this.usedNames.add(a.name);
-    const pool = [...NAMES[sex], ...NAMES.X];
+    const pool = [...NAMES_BY_SEX[sex], ...NAMES_BY_SEX.X];
     const free = pool.filter((n) => !this.usedNames.has(n));
     let name = free.length ? this.pick(free) : '';
-    while (!name || this.usedNames.has(name)) name = `${this.pick(NAMES[sex])}-${this.pick(pool)}`;
+    while (!name || this.usedNames.has(name)) name = `${this.pick(NAMES_BY_SEX[sex])}-${this.pick(pool)}`;
     this.usedNames.add(name);
     return name;
   }
