@@ -53,6 +53,11 @@ export interface FounderSpec {
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+/** Identifiant tiré du nom (sans accents ni ponctuation) : « Zoé » et « Zoe » donnent le même. */
+export function founderId(name: string) {
+  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 export function personalityFromTraits(traits: TraitId[]): Personality {
   const t: Record<Tendency, number> = { honesty: 0.6, ambition: 0.4, generosity: 0.5, diligence: 0.6, curiosity: 0.5 };
   for (const id of traits) for (const [k, v] of Object.entries(TRAITS[id]?.effect ?? {})) t[k as Tendency] += v;
@@ -78,7 +83,7 @@ export function validateFounders(specs: FounderSpec[]): string | null {
     }
   }
   if (specs.filter((s) => s.ai).length > 1) return 'Un seul villageois peut être piloté par l’IA.';
-  if (new Set(specs.map((s) => s.name.trim().toLowerCase())).size !== specs.length) return 'Deux villageois ne peuvent pas porter le même nom.';
+  if (new Set(specs.map((s) => founderId(s.name))).size !== specs.length) return 'Deux villageois ne peuvent pas porter le même nom.';
   return null;
 }
 

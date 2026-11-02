@@ -89,3 +89,9 @@ test('un changement de maire et un vol le même jour : deux numéros', async () 
   assert.match(titles, /devient maire/);
   assert.match(titles, /Vol chez Marie/);
 });
+
+test('à poids égal ou proche, la nouvelle du jour passe avant celle de la veille', () => {
+  const yesterday = { ...ev(1, 'trial.verdict', '⚖️ Le village déclare Félix coupable'), day: 1 } as SimEvent;
+  const today = { ...ev(2, 'crime.theft', '🚨 Vol chez Lina'), day: 2 } as SimEvent;
+  assert.equal(pickHeadline([yesterday, today], new Set())?.seq, 2);
+});

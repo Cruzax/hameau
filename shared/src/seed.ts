@@ -1,5 +1,5 @@
 import { facing } from './geometry';
-import { autoRoles, personalityFromTraits, randomOrientation, type FounderSpec } from './traits';
+import { autoRoles, founderId, personalityFromTraits, randomOrientation, type FounderSpec } from './traits';
 import type { Agent, AgentId, House, Inventory, Road, Role, Terrain, Vec2, WorldState } from './types';
 
 const PLAZA: Vec2 = { x: 0, z: 0 };
@@ -227,7 +227,7 @@ const FOUNDER_COLORS: [string, string][] = [['#f3e3c3', '#c0573e'], ['#e8d2a8', 
 /** Monde de départ d'une histoire choisie : 4 maisons, la chaîne du pain tenue par le village, la place et les ponts. */
 export function createFounderWorld(founders: FounderSpec[], rand: () => number = Math.random): WorldState {
   const roles = autoRoles(founders);
-  const ids = founders.map((f, i) => f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `habitant-${i}`);
+  const ids = founders.map((f, i) => founderId(f.name) || `habitant-${i}`);
   const agents = founders.map((f, i) => {
     const a = agent(ids[i], f.name.trim(), roles[i], personalityFromTraits(f.traits), []);
     a.sex = f.sex && f.sex !== 'auto' ? f.sex : rand() < 0.5 ? 'M' : 'F';

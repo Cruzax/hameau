@@ -471,12 +471,12 @@ export class Daily {
           const qty = Math.min(3, oi.pain);
           oi.pain -= qty;
           inv.pain += qty;
-          loss = `${qty} pain${qty > 1 ? 's' : ''} ont disparu`;
+          loss = qty > 1 ? `${qty} pains ont disparu` : 'un pain a disparu';
         } else if (oi.pieces > 0) {
           const qty = Math.min(3, oi.pieces);
           oi.pieces -= qty;
           inv.pieces += qty;
-          loss = `${qty} pièce${qty > 1 ? 's' : ''} ont disparu`;
+          loss = qty > 1 ? `${qty} pièces ont disparu` : 'une pièce a disparu';
         }
         if (loss) this.justice.recordTheft(sim, a.id, owner.id, loss);
         break;

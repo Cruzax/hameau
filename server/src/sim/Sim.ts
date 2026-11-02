@@ -198,7 +198,8 @@ export class Sim {
     const today = this.journal.events.filter((e) => e.day === this.clock.day);
     const hungry = new Set(today.filter((e) => /meurt de faim/.test(e.text)).flatMap((e) => e.actors));
     const issues = this.world.gazettes.filter((g) => g.day === this.clock.day).length;
-    const stifled = today.some((e) => score(e) >= 6 && !this.coveredNews.has(e.seq));
+    // Une grosse affaire n'est « étouffée » que si elle reste sans numéro le lendemain soir.
+    const stifled = this.journal.events.some((e) => e.day === this.clock.day - 1 && score(e) >= 6 && !this.coveredNews.has(e.seq));
     this.politics.onDayEnd(this, { issues, stifled, hungry, paid: this.economy.paidToday });
     if (this.lifeEnabled) {
       // Le voisinage rapproche : un peu d'estime en plus entre voisins directs, chaque soir.

@@ -7,6 +7,8 @@ import type { AgentId, SimEvent, WorldState } from '@hameau/shared';
 export const HEADLINE_MIN = 4;
 /** À partir de ce poids, un second numéro (édition spéciale) peut paraître le même jour. */
 export const SPECIAL_EDITION = 10;
+/** Malus d'une nouvelle de la veille dans le choix de la une. */
+const STALE_PENALTY = 3;
 /** Nombre de « meurt de faim » dans la journée qui fait une famine. */
 const FAMINE_COUNT = 5;
 
@@ -37,7 +39,10 @@ export function pickHeadline(events: SimEvent[], covered: Set<number>): SimEvent
     const famine = { ...hungry[0], seq: -hungry[0].day, type: 'life.need', text: 'La faim gagne le village : plusieurs habitants n’ont plus rien à manger' } as SimEvent;
     candidates.push({ e: famine, s: 7 });
   }
-  const best = candidates.sort((a, b) => b.s - a.s)[0];
+  // Une nouvelle de la veille a déjà un peu vieilli : à poids proche, celle du jour passe devant.
+  const today = Math.max(0, ...events.map((e) => e.day));
+  const rank = (c: { e: SimEvent; s: number }) => c.s - (c.e.day < today ? STALE_PENALTY : 0);
+  const best = candidates.sort((a, b) => rank(b) - rank(a))[0];
   return best && best.s >= HEADLINE_MIN ? best.e : null;
 }
 

@@ -60,3 +60,8 @@ test('une histoire à 4 fondateurs tourne 5 jours sans planter', async () => {
   const { sim } = await runVillage({ days: 5, founders: FOUNDERS });
   assert.ok(Object.keys(sim.world.agents).length >= 4);
 });
+
+test('deux fondateurs dont les noms ne diffèrent que par les accents sont refusés', () => {
+  const err = validateFounders([{ name: 'Zoé', traits: [], role: 'auto' }, { name: 'Zoe', traits: [], role: 'auto' }]);
+  assert.match(err ?? '', /même nom/);
+});
