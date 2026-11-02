@@ -1,8 +1,10 @@
 import type { Agent, AgentId, Good, WorldState, Workplace, WorkplaceKind } from '@hameau/shared';
 import type { Sim } from './Sim';
+import { newWorkplace } from './god';
 import {
   BAKERY_RESERVE, BREAD_PER_FLOUR, BREAD_PER_PURCHASE, BREAD_PER_WOOD, FIRE_AFTER_ABSENCES, FIRE_AFTER_UNPAID_DAYS, GIFTS_PER_DAY,
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
+  BANKRUPT_AFTER_DAYS, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
 } from './economyConfig';
 
 /** Qui achète quoi à qui, et combien par employé (stock visé). */
@@ -34,10 +36,16 @@ export class Economy {
   private present = new Set<AgentId>();
   /** Jours d'absence récents, par habitant. */
   private absences = new Map<AgentId, number[]>();
+  /** Soirs d'affilée sans de quoi payer le moindre salaire, par lieu. */
+  private brokeDays = new Map<string, number>();
   /** Pains offerts aujourd'hui, par boulangerie. */
   private gifts = new Map<string, number>();
 
-  constructor(private readonly rand: () => number = Math.random) {}
+  constructor(
+    private readonly rand: () => number = Math.random,
+    /** Ouvrir de nouveaux lieux de travail le soir (désactivé dans certains tests). */
+    private readonly growth = true,
+  ) {}
 
   jobOf(w: WorldState, agentId: AgentId): Workplace | undefined {
     const id = w.agents[agentId]?.job?.workplaceId;
@@ -232,6 +240,39 @@ export class Economy {
         inv.pieces += wp.till - TILL_FLOAT;
         wp.till = TILL_FLOAT;
       }
+      // Caisse vide trop longtemps : faillite.
+      const broke = wp.till < Math.min(...Object.values(WAGES)) ? (this.brokeDays.get(wp.id) ?? 0) + 1 : 0;
+      this.brokeDays.set(wp.id, broke);
+      if (broke >= BANKRUPT_AFTER_DAYS) this.close(sim, wp);
     }
+    if (this.growth) this.grow(sim);
+  }
+
+  /** Faillite : tout le monde perd son emploi, le bâtiment reste vide (un futur lieu pourra le reprendre). */
+  close(sim: Sim, wp: Workplace) {
+    const w = sim.world;
+    for (const id of [...wp.workers]) this.quit(sim, id, `${placeName(wp)} ferme ses portes`);
+    delete w.workplaces[wp.id];
+    this.brokeDays.delete(wp.id);
+    sim.emit('workplace.closed', wp.ownerId ? [wp.ownerId] : [], `🔒 Faillite : ${placeName(wp)} ferme ses portes, faute d’argent.`, { workplaceId: wp.id, kind: wp.kind });
+    sim.broadcastPatch({ workplaces: w.workplaces });
+  }
+
+  /**
+   * Un lieu de travail de plus, au plus un par soir : d'abord ce qui manque pour faire du pain,
+   * puis, s'il y a trop de sans-emploi et plus de place nulle part, le métier le moins représenté.
+   */
+  grow(sim: Sim) {
+    const w = sim.world;
+    const count = (k: WorkplaceKind) => Object.values(w.workplaces).filter((x) => x.kind === k).length;
+    let kind = ESSENTIAL.find((k) => !count(k));
+    if (!kind) {
+      const jobless = Object.values(w.agents).filter((a) => isAdult(w, a) && !a.job).length;
+      const openSlot = Object.values(w.workplaces).some((x) => x.workers.length < x.slots);
+      if (jobless > 2 && !openSlot) kind = (Object.keys(GROWTH_WEIGHT) as WorkplaceKind[]).sort((x, y) => count(x) / GROWTH_WEIGHT[x]! - count(y) / GROWTH_WEIGHT[y]!)[0];
+    }
+    if (!kind) return;
+    const founder = Object.values(w.agents).filter((a) => isAdult(w, a) && invOf(a).pieces >= FOUNDING_COST).sort((x, y) => invOf(y).pieces - invOf(x).pieces)[0];
+    newWorkplace(sim, kind, founder?.id ?? null);
   }
 }

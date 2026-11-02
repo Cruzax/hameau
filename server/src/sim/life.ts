@@ -1,7 +1,8 @@
 import { isDwelling, mulberry32, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode, neighbors } from './network';
-import { houseName, newHouse, slug } from './god';
+import { newHouse, slug } from './god';
+import { WAGES } from './economyConfig';
 
 // Vie du village : le monde évolue tout seul, chaque soir, selon les relations entre habitants.
 // Règles simples et gratuites (aucun appel LLM) ; les agents en sont informés par leur mémoire.
@@ -18,6 +19,13 @@ const LEAVE_CHANCE = 0.3;
 
 const NAMES = ['Léa', 'Hugo', 'Jade', 'Nathan', 'Chloé', 'Lucas', 'Emma', 'Tom', 'Zoé', 'Noah', 'Sacha', 'Lina', 'Gabin', 'Rose', 'Malo', 'Nina', 'Théo', 'Alba'];
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
+
+/** Où bâtir une maison neuve : près d'un lieu de travail qui embauche (les quartiers se forment), sinon près de la place. */
+function homeSite(sim: Sim) {
+  const w = sim.world;
+  const hiring = Object.values(w.workplaces).filter((wp) => wp.workers.length < wp.slots).sort((x, y) => WAGES[y.kind] - WAGES[x.kind])[0];
+  return (hiring && w.houses[hiring.houseId]?.position) ?? w.terrain.plaza.center;
+}
 
 const pairKey = (a: AgentId, b: AgentId) => [a, b].sort().join('|');
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -183,7 +191,7 @@ export class Life {
       const vacant = (['ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'] as Role[]).find((r) => !Object.values(w.agents).some((x) => x.role === r));
       // Le métier (le travail) se trouve ensuite à l'embauche ; le rôle sert à la gazette.
       const role: Role = vacant ?? 'CITOYEN';
-      const house = home && newHouse(sim, a.id, home, role);
+      const house = newHouse(sim, a.id, homeSite(sim), role);
       if (!house) continue;
       w.houses[house.id] = house;
       a.houseId = house.id;
@@ -233,8 +241,7 @@ export class Life {
     const r = this.rand();
     const role: Role = r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
     const empty = Object.values(w.houses).find((h) => !h.ownerId && isDwelling(h));
-    const near = this.pick(Object.values(w.houses).filter((h) => isDwelling(h) && h.ownerId));
-    const house = empty ?? (near && newHouse(sim, id, near, role));
+    const house = empty ?? newHouse(sim, id, homeSite(sim), role);
     if (!house) return;
     house.ownerId = id;
     w.houses[house.id] = house;
@@ -259,7 +266,7 @@ export class Life {
       o.opinions[id] = -0.05; // on se méfie un peu des étrangers
     }
     w.agents[id] = agent;
-    const where = empty ? `reprend la maison vide` : `s’installe près de chez ${houseName(sim, near.id)}`;
+    const where = empty ? `reprend la maison vide` : `s’installe dans une maison neuve`;
     sim.emit('agent.added', [id], `🚶 Quelqu’un de nouveau au village : ${name} ${where}.`, { agentId: id, role, agent, house });
     sim.broadcastPatch({ houses: w.houses });
     sim.touchAgents();

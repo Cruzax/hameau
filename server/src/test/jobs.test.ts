@@ -17,7 +17,7 @@ function setup(kinds: { kind: WorkplaceKind; till: number }[]) {
     w.workplaces[id] = wp;
   });
   // Toujours présent au travail (pas d'absence tirée au sort).
-  const eco = new Economy(() => 0);
+  const eco = new Economy(() => 0, false);
   sim.economy = eco;
   return { sim, w, eco };
 }

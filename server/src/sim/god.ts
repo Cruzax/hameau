@@ -11,9 +11,14 @@ import {
   type Road,
   type Role,
   type Vec2,
+  type Workplace,
+  type WorkplaceKind,
+  distToPolyline,
+  NATURE_SPOTS,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode } from './network';
+import { FOUNDING_COST, SLOTS } from './economyConfig';
 
 // Pouvoirs du panneau « Dieu ». Tout passe par le journal : chaque intervention est rejouable.
 
@@ -93,9 +98,10 @@ export function slug(sim: Sim, name: string) {
 }
 
 /** Maison neuve pour `ownerId` près de `near` (pas encore ajoutée au monde), ou null faute de place. */
-export function newHouse(sim: Sim, ownerId: AgentId, near: House, role: Role): House | null {
+export function newHouse(sim: Sim, ownerId: AgentId, near: Vec2, role: Role): House | null {
   const w = sim.world;
-  const spot = findSpot(sim, near.position);
+  // On bâtit au plus près du point visé (son travail, ou la place).
+  const spot = findSpot(sim, near, (p) => -dist(p, near));
   if (!spot) return null;
   const [wall, roof] = PALETTE[Object.keys(w.houses).length % PALETTE.length];
   return {
@@ -112,7 +118,7 @@ export function addAgent(sim: Sim, c: Extract<ClientToServer, { type: 'god.agent
   if (!near || !name) return;
   const id = slug(sim, name);
   const role = c.agent.role;
-  const house = newHouse(sim, id, near, role);
+  const house = newHouse(sim, id, near.position, role);
   if (!house) {
     sim.emit('god.inject', [], `⚠️ Plus de place près de ${houseName(sim, near.id)} pour une nouvelle maison.`);
     return;
@@ -166,4 +172,73 @@ export function exileAgent(sim: Sim, id: AgentId) {
 function esteem(sim: Sim, id: AgentId) {
   const xs = Object.values(sim.world.agents).filter((a) => a.id !== id).map((a) => a.opinions[id] ?? 0);
   return xs.reduce((s, x) => s + x, 0) / Math.max(1, xs.length);
+}
+
+// ─── Lieux de travail ────────────────────────────────────────────────────────
+
+const WORK_STYLE: Record<WorkplaceKind, HouseStyle> = {
+  ferme: 'ferme', moulin: 'moulin', scierie: 'scierie', forge: 'forge', boulangerie: 'boulangerie', auberge: 'auberge', herboristerie: 'echoppe',
+};
+const WORK_WHERE: Record<WorkplaceKind, string> = {
+  ferme: 'aux abords du village', moulin: 'au bord de la rivière', scierie: 'à l’orée de la forêt', forge: 'près de la place',
+  boulangerie: 'près de la place', auberge: 'près de la place', herboristerie: 'près de la place',
+};
+const WORK_ARTICLE: Record<WorkplaceKind, string> = {
+  ferme: 'une ferme', moulin: 'un moulin', scierie: 'une scierie', forge: 'une forge', boulangerie: 'une boulangerie', auberge: 'une auberge', herboristerie: 'une herboristerie',
+};
+
+let workplaceSeq = 0;
+
+/** Point visé et préférence d'emplacement : fermes en bord de vallée, scierie vers la forêt, moulin au bord de l'eau. */
+function workplaceSite(sim: Sim, kind: WorkplaceKind): { near: Vec2; prefer: (p: Vec2) => number } {
+  const w = sim.world;
+  const center = w.terrain.plaza.center;
+  switch (kind) {
+    case 'ferme': {
+      const a = Math.random() * Math.PI * 2;
+      const near = { x: Math.cos(a) * 26, z: Math.sin(a) * 26 };
+      return { near, prefer: (p) => dist(p, center) };
+    }
+    case 'scierie':
+      return { near: NATURE_SPOTS.foret, prefer: (p) => -dist(p, NATURE_SPOTS.foret) };
+    case 'moulin': {
+      const pts = w.terrain.river.points;
+      const near = pts[1 + Math.floor(Math.random() * (pts.length - 2))];
+      return { near, prefer: (p) => -Math.abs(distToPolyline(p, pts) - 5) - dist(p, center) * 0.05 };
+    }
+    default:
+      return { near: center, prefer: (p) => -dist(p, center) };
+  }
+}
+
+/**
+ * Ouvre un lieu de travail : un bâtiment vide du bon style s'il y en a un, sinon un nouveau, raccordé au réseau.
+ * Le fondateur investit 20 pièces et devient patron ; sans fondateur, c'est le village qui tient le lieu.
+ */
+export function newWorkplace(sim: Sim, kind: WorkplaceKind, founderId: AgentId | null): Workplace | null {
+  const w = sim.world;
+  const style = WORK_STYLE[kind];
+  const used = new Set(Object.values(w.workplaces).map((x) => x.houseId));
+  let house = Object.values(w.houses).find((h) => h.kind === 'travail' && h.style === style && !used.has(h.id));
+  if (!house) {
+    const site = workplaceSite(sim, kind);
+    const spot = findSpot(sim, site.near, site.prefer) ?? Object.values(w.houses).map((h) => findSpot(sim, h.position, site.prefer)).find(Boolean);
+    if (!spot) return null;
+    const id = `w-${kind}-${sim.clock.tick}-${Object.keys(w.houses).length}`;
+    house = { id, ownerId: null, kind: 'travail', position: spot, rotation: facing(spot, w.terrain.plaza.center), style, wallColor: '#ecdcbc', roofColor: '#8a4a2a' };
+    w.houses[id] = house;
+    connectNode(sim, id);
+  }
+  const founder = founderId ? w.agents[founderId] : undefined;
+  if (founder) (founder.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 }).pieces -= FOUNDING_COST;
+  const wp: Workplace = {
+    id: `wp-${++workplaceSeq}-${house.id}`, kind, era: 'ancienne', houseId: house.id, ownerId: founder?.id ?? null,
+    slots: SLOTS[kind], workers: [], till: FOUNDING_COST, stock: {}, unpaidDays: 0, openedDay: w.clock.day,
+  };
+  w.workplaces[wp.id] = wp;
+  sim.emit('workplace.opened', founder ? [founder.id] : [],
+    `🏗 Ouverture d’${WORK_ARTICLE[kind]} ${WORK_WHERE[kind]} (aux commandes : ${founder ? founder.name : 'le village'}).`,
+    { workplaceId: wp.id, kind, ownerId: wp.ownerId });
+  sim.broadcastPatch({ houses: w.houses, workplaces: w.workplaces });
+  return wp;
 }

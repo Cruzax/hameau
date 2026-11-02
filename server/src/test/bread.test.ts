@@ -10,7 +10,7 @@ function chain(kinds: WorkplaceKind[], till = 50) {
   const w = sim.world;
   w.workplaces = {};
   for (const a of Object.values(w.agents)) delete a.job;
-  const eco = new Economy(() => 0);
+  const eco = new Economy(() => 0, false);
   sim.economy = eco;
   kinds.forEach((kind, i) => {
     const id = `wp-${kind}`;

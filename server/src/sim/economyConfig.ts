@@ -31,3 +31,12 @@ export const BREAD_PER_PURCHASE = 2;
 /** La boulangerie garde quelques pains en réserve et n'en offre que quelques-uns par jour. */
 export const BAKERY_RESERVE = 2;
 export const GIFTS_PER_DAY = 4;
+
+/** Ce qu'il faut au village pour avoir du pain : ouvert en priorité s'il en manque un. */
+export const ESSENTIAL: WorkplaceKind[] = ['boulangerie', 'ferme', 'moulin', 'scierie'];
+/** Poids des métiers quand on ouvre un lieu de plus pour les sans-emploi (plus de fermes que de forges). */
+export const GROWTH_WEIGHT: Partial<Record<WorkplaceKind, number>> = { ferme: 2, boulangerie: 1.5, moulin: 1, scierie: 1, forge: 0.5 };
+/** Mise de départ d'un fondateur, qui devient patron. */
+export const FOUNDING_COST = 20;
+/** Soirs d'affilée sans de quoi payer un salaire avant la faillite. */
+export const BANKRUPT_AFTER_DAYS = 7;
