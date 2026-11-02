@@ -58,8 +58,8 @@ test('un salarié part pour un emploi mieux payé dès qu’une place se libère
   assert.equal(a.job?.workplaceId, 'wp-1');
 });
 
-test('le patron empoche ce qui dépasse 10 pièces dans la caisse', () => {
-  const { sim, w, eco } = setup([{ kind: 'moulin', till: 30 }]);
+test('le patron empoche ce qui dépasse le fonds de caisse', () => {
+  const { sim, w, eco } = setup([{ kind: 'moulin', till: 50 }]);
   const [boss, worker] = Object.values(w.agents);
   w.workplaces['wp-0'].ownerId = boss.id;
   eco.hire(sim, worker.id, 'wp-0');
@@ -67,7 +67,7 @@ test('le patron empoche ce qui dépasse 10 pièces dans la caisse', () => {
   const before = boss.inventory?.pieces ?? 5;
   eco.morning(sim);
   eco.evening(sim);
-  // 30 - 4 de salaire = 26 ; le patron prend 16, la caisse garde 10.
-  assert.equal(w.workplaces['wp-0'].till, 10);
+  // 50 - 4 de salaire = 46 ; la caisse garde 30, le patron prend 16.
+  assert.equal(w.workplaces['wp-0'].till, 30);
   assert.equal(boss.inventory!.pieces, before + 16);
 });

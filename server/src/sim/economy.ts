@@ -1,6 +1,19 @@
-import type { Agent, AgentId, WorldState, Workplace } from '@hameau/shared';
+import type { Agent, AgentId, Good, WorldState, Workplace, WorkplaceKind } from '@hameau/shared';
 import type { Sim } from './Sim';
-import { FIRE_AFTER_ABSENCES, FIRE_AFTER_UNPAID_DAYS, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES } from './economyConfig';
+import {
+  BAKERY_RESERVE, BREAD_PER_FLOUR, BREAD_PER_PURCHASE, BREAD_PER_WOOD, FIRE_AFTER_ABSENCES, FIRE_AFTER_UNPAID_DAYS, GIFTS_PER_DAY,
+  OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
+} from './economyConfig';
+
+/** Qui achète quoi à qui, et combien par employé (stock visé). */
+const SUPPLY: { buyer: WorkplaceKind; good: Good; seller: WorkplaceKind; perWorker: number }[] = [
+  { buyer: 'moulin', good: 'ble', seller: 'ferme', perWorker: OUTPUT_PER_WORKER.farine },
+  { buyer: 'boulangerie', good: 'farine', seller: 'moulin', perWorker: OUTPUT_PER_WORKER.pain / BREAD_PER_FLOUR },
+  { buyer: 'boulangerie', good: 'bois', seller: 'scierie', perWorker: OUTPUT_PER_WORKER.pain / BREAD_PER_WOOD },
+  { buyer: 'forge', good: 'bois', seller: 'scierie', perWorker: OUTPUT_PER_WORKER.outils },
+];
+
+const invOf = (a: Agent) => (a.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
 
 // Emplois et salaires : on gagne sa vie dans un lieu de travail, le patron garde le surplus.
 
@@ -21,6 +34,8 @@ export class Economy {
   private present = new Set<AgentId>();
   /** Jours d'absence récents, par habitant. */
   private absences = new Map<AgentId, number[]>();
+  /** Pains offerts aujourd'hui, par boulangerie. */
+  private gifts = new Map<string, number>();
 
   constructor(private readonly rand: () => number = Math.random) {}
 
@@ -77,6 +92,9 @@ export class Economy {
       if (!best) continue;
       if (!current || WAGES[best.kind] >= WAGES[current.kind] + SWITCH_IF_BETTER_BY) this.hire(sim, a.id, best.id);
     }
+    // Le potager : un pain par jour pour qui n'a pas d'emploi.
+    for (const a of Object.values(w.agents)) if (isAdult(w, a) && !a.job) invOf(a).pain += SUBSISTENCE_BREAD;
+    this.gifts.clear();
     this.present.clear();
     for (const wp of Object.values(w.workplaces)) {
       for (const id of [...wp.workers]) {
@@ -96,9 +114,100 @@ export class Economy {
     }
   }
 
-  /** Le soir : chacun est payé s'il a travaillé ; caisse vide trop longtemps = renvoi ; surplus au patron. */
+  /** Boulangerie la mieux fournie. */
+  bestBakery(w: WorldState): Workplace | undefined {
+    return Object.values(w.workplaces).filter((wp) => wp.kind === 'boulangerie').sort((x, y) => (y.stock.pain ?? 0) - (x.stock.pain ?? 0))[0];
+  }
+
+  /** Achat de pain à la boulangerie la mieux fournie ; un affamé sans le sou reçoit un pain. Rend le nombre de pains obtenus. */
+  buyBread(sim: Sim, a: Agent): number {
+    const bakery = this.bestBakery(sim.world);
+    if (!bakery) return 0;
+    const inv = invOf(a);
+    const stock = bakery.stock.pain ?? 0;
+    const qty = Math.min(BREAD_PER_PURCHASE, stock - BAKERY_RESERVE, Math.floor(inv.pieces / PRICES.pain));
+    if (qty > 0) {
+      bakery.stock.pain = stock - qty;
+      inv.pain += qty;
+      inv.pieces -= qty * PRICES.pain;
+      bakery.till += qty * PRICES.pain;
+      sim.emit('life.trade', [a.id], `🥖 ${a.name} achète ${qty} pain${qty > 1 ? 's' : ''} à la boulangerie.`, { item: 'pain', qty, workplaceId: bakery.id });
+      return qty;
+    }
+    const given = this.gifts.get(bakery.id) ?? 0;
+    const starving = (a.needs?.satiete ?? 1) < 0.25 && inv.pieces < PRICES.pain;
+    if (starving && stock > BAKERY_RESERVE && given < GIFTS_PER_DAY) {
+      bakery.stock.pain = stock - 1;
+      inv.pain++;
+      this.gifts.set(bakery.id, given + 1);
+      const baker = bakery.workers.map((id) => sim.world.agents[id]).find(Boolean);
+      sim.emit('life.trade', [a.id, ...(baker ? [baker.id] : [])], `🤲 ${baker ? baker.name : 'La boulangerie'} offre un pain à ${a.name}, qui n’a plus un sou.`, { item: 'pain', qty: 1, gift: true });
+      if (baker) sim.adjustOpinion(a.id, baker.id, 0.15, 'Du pain offert quand je n’avais rien');
+      return 1;
+    }
+    return 0;
+  }
+
+  /** Les lieux de travail se fournissent les uns chez les autres, de caisse à caisse. */
+  trade(sim: Sim) {
+    const w = sim.world;
+    for (const { buyer, good, seller, perWorker } of SUPPLY) {
+      for (const b of Object.values(w.workplaces).filter((x) => x.kind === buyer)) {
+        const want = Math.ceil(perWorker * Math.max(1, b.workers.length)) - (b.stock[good] ?? 0);
+        for (const s of Object.values(w.workplaces).filter((x) => x.kind === seller).sort((x, y) => (y.stock[good] ?? 0) - (x.stock[good] ?? 0))) {
+          const qty = Math.min(want, s.stock[good] ?? 0, Math.floor(b.till / PRICES[good]));
+          if (qty <= 0) continue;
+          s.stock[good] = (s.stock[good] ?? 0) - qty;
+          b.stock[good] = (b.stock[good] ?? 0) + qty;
+          b.till -= qty * PRICES[good];
+          s.till += qty * PRICES[good];
+          break;
+        }
+      }
+    }
+  }
+
+  /** Fin de journée de travail : chaque lieu produit selon ses employés présents et ses réserves. */
+  produce(sim: Sim) {
+    const w = sim.world;
+    for (const wp of Object.values(w.workplaces)) {
+      const n = wp.workers.filter((id) => this.present.has(id)).length;
+      if (!n) continue;
+      const st = wp.stock;
+      const add = (g: Good, q: number) => (st[g] = (st[g] ?? 0) + q);
+      switch (wp.kind) {
+        case 'ferme': add('ble', OUTPUT_PER_WORKER.ble * n); break;
+        case 'scierie': add('bois', OUTPUT_PER_WORKER.bois * n); break;
+        case 'moulin': {
+          const q = Math.min(st.ble ?? 0, OUTPUT_PER_WORKER.farine * n);
+          add('ble', -q);
+          add('farine', q);
+          break;
+        }
+        case 'boulangerie': {
+          const q = Math.min(OUTPUT_PER_WORKER.pain * n, (st.farine ?? 0) * BREAD_PER_FLOUR, (st.bois ?? 0) * BREAD_PER_WOOD);
+          if (q <= 0) break;
+          add('farine', -Math.ceil(q / BREAD_PER_FLOUR));
+          add('bois', -Math.ceil(q / BREAD_PER_WOOD));
+          add('pain', q);
+          sim.emit('life.work', wp.workers.filter((id) => this.present.has(id)), `🍞 La boulangerie sort ${q} pains du four.`, { work: 'pain', qty: q, workplaceId: wp.id });
+          break;
+        }
+        case 'forge': {
+          const q = Math.min(st.bois ?? 0, OUTPUT_PER_WORKER.outils * n);
+          add('bois', -q);
+          add('outils', q);
+          break;
+        }
+      }
+    }
+  }
+
+  /** Le soir : commerce, production, puis paie ; caisse vide trop longtemps = renvoi ; surplus au patron. */
   evening(sim: Sim) {
     const w = sim.world;
+    this.trade(sim);
+    this.produce(sim);
     for (const wp of Object.values(w.workplaces)) {
       let unpaid = false;
       for (const id of wp.workers) {

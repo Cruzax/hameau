@@ -15,4 +15,19 @@ export const FIRE_AFTER_UNPAID_DAYS = 3;
 /** Absences sur les 7 derniers jours avant un renvoi. */
 export const FIRE_AFTER_ABSENCES = 3;
 /** Le patron empoche ce qui dépasse ce fonds de caisse. */
-export const TILL_FLOAT = 10;
+export const TILL_FLOAT = 30;
+
+/** Production par employé présent et par jour. Le moulin transforme le blé, la boulangerie la farine et le bois. */
+export const OUTPUT_PER_WORKER = { ble: 6, bois: 4, farine: 6, pain: 12, outils: 1 } as const;
+/** Ce que cuire 12 pains consomme : 4 farines et 2 bûches (soit 3 pains par farine, 6 par bûche). */
+export const BREAD_PER_FLOUR = 3;
+export const BREAD_PER_WOOD = 6;
+/** Prix de vente, en pièces. */
+export const PRICES = { ble: 1, farine: 2, bois: 2, outils: 6, pain: 2 } as const;
+/** Pain du potager, chaque matin, pour un adulte sans emploi. */
+export const SUBSISTENCE_BREAD = 1;
+/** Pains qu'un habitant achète d'un coup. */
+export const BREAD_PER_PURCHASE = 2;
+/** La boulangerie garde quelques pains en réserve et n'en offre que quelques-uns par jour. */
+export const BAKERY_RESERVE = 2;
+export const GIFTS_PER_DAY = 4;

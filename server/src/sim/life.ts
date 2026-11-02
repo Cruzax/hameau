@@ -181,10 +181,8 @@ export class Life {
       if (sim.clock.day - a.bornDay < ADULT_AFTER_DAYS || home?.ownerId === a.id) continue;
       // Un métier vacant dans la gazette ? L'enfant le reprend.
       const vacant = (['ECLAIREUR', 'ECRIVAIN', 'EDITEUR', 'LECTEUR'] as Role[]).find((r) => !Object.values(w.agents).some((x) => x.role === r));
-      // Un village qui grandit a besoin d'une boulangerie de plus (une pour dix habitants).
-      const bakers = Object.values(w.agents).filter((x) => x.role === 'BOULANGER').length;
-      const needBaker = Object.keys(w.agents).length > 10 * Math.max(1, bakers);
-      const role: Role = vacant ?? (needBaker ? 'BOULANGER' : 'CITOYEN');
+      // Le métier (le travail) se trouve ensuite à l'embauche ; le rôle sert à la gazette.
+      const role: Role = vacant ?? 'CITOYEN';
       const house = home && newHouse(sim, a.id, home, role);
       if (!house) continue;
       w.houses[house.id] = house;
@@ -233,10 +231,7 @@ export class Life {
     if (!name) return;
     const id = slug(sim, name);
     const r = this.rand();
-    // Un village qui grandit attire aussi un boulanger de plus (une boulangerie pour dix habitants).
-    const bakers = Object.values(w.agents).filter((x) => x.role === 'BOULANGER').length;
-    const needBaker = Object.keys(w.agents).length >= 10 * Math.max(1, bakers);
-    const role: Role = needBaker ? 'BOULANGER' : r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
+    const role: Role = r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
     const empty = Object.values(w.houses).find((h) => !h.ownerId && isDwelling(h));
     const near = this.pick(Object.values(w.houses).filter((h) => isDwelling(h) && h.ownerId));
     const house = empty ?? (near && newHouse(sim, id, near, role));

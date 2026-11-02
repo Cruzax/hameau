@@ -12,7 +12,7 @@ import {
 } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { placeName as workplaceName } from './economy';
-import { WORK_HOURS } from './economyConfig';
+import { PRICES, WORK_HOURS } from './economyConfig';
 import { isActive } from './effects';
 import { findPath } from './paths';
 import { createRumor, hottestRumor, rumorToShare, SLANDERS, tellRumor } from './rumors';
@@ -28,20 +28,13 @@ const WALK_SPEED = 0.7;           // unités de monde par tick (un peu plus vite
 const DECIDE_EVERY = 12;          // chaque habitant réfléchit à son emploi du temps tous les N ticks
 const MEET_EVERY = 14;            // une conversation par lieu fréquenté, tous les N ticks
 const NEEDS_PATCH_EVERY = 8;      // fréquence d'envoi des besoins au site
-const BREAD_PRICE = 1;
-const WOOD_PRICE = 2;
-const BAKER_RESERVE = 2;          // la boulangère garde toujours deux pains pour elle
 const TAX_THRESHOLD = 6;          // au-delà de cette somme, on paie une pièce d'impôt chaque matin
 const CARE_PRICE = 2;
 const TAVERN_PRICE = 1;
-const BREAD_PER_WOOD = 6;         // une bûche cuit six pains
-const BAKES_PER_BATCH = 3;        // bûches enfournées le matin (et 2 de plus à midi)
 const HUNGER_PER_DAY = 0.9;       // satiété perdue par jour
 const BREAD_FILLS = 0.6;          // satiété rendue par un pain
 const RETRY_TICKS = 60;           // après un achat raté, on attend avant de retenter
 
-/** Qui coupe du bois le matin (les métiers sans production propre). */
-const WOODCUTTERS: Role[] = ['CITOYEN', 'ECLAIREUR', 'LECTEUR', 'VOLEUR', 'MENTEUR', 'BARDE', 'ECRIVAIN', 'EDITEUR'];
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
@@ -161,9 +154,6 @@ export class Daily {
       const text = t.ev.run(sim, helpers(sim));
       if (text) sim.emit('village.event', [], text, { event: t.ev.id });
     }
-    if (this.at(sim, 12)) {
-      for (const b of Object.values(sim.world.agents)) if (b.role === 'BOULANGER') this.bake(sim, b, Math.ceil(this.batchSize(sim) / 2));
-    }
     if (this.party && this.party.day === sim.clock.day && this.at(sim, this.party.hour)) this.startParty(sim);
 
     for (const a of agents) {
@@ -229,25 +219,9 @@ export class Daily {
   morning(sim: Sim) {
     const mayor = sim.agent(sim.world.mayorId);
     if (mayor) this.inv(mayor).pieces += 3; // le domaine du village rapporte un peu chaque jour
-    // Sans boulangerie (village d'origine), chacun vit de son potager.
-    const hasBaker = Object.values(sim.world.agents).some((x) => x.role === 'BOULANGER');
-    if (!hasBaker) for (const x of Object.values(sim.world.agents)) this.inv(x).pain += 2;
     for (const a of Object.values(sim.world.agents)) {
       a.asleep = false;
       const inv = this.inv(a);
-      if (a.role === 'BOULANGER') {
-        if (inv.bois > 0) {
-          this.bake(sim, a, this.batchSize(sim));
-        } else {
-          sim.emit('life.work', [a.id], `🪵 Pas de bois chez ${a.name} : pas de pain ce matin !`, { work: 'pain', failed: true });
-          this.needs(a).humeur = clamp01(this.needs(a).humeur - 0.15);
-        }
-      } else if (a.role === 'FORGERON' && inv.bois > 0 && inv.outils < 5) {
-        inv.bois--;
-        inv.outils++;
-      } else if (WOODCUTTERS.includes(a.role) && Math.random() < 0.15) {
-        inv.bois++; // une bûche ramassée près de chez soi
-      }
       // Impôt progressif : un dixième de ce qui dépasse le seuil, versé au maire (qui paie les salaires).
       if (mayor && a.id !== mayor.id && inv.pieces > TAX_THRESHOLD) {
         const tax = Math.ceil((inv.pieces - TAX_THRESHOLD) / 10);
@@ -284,29 +258,6 @@ export class Daily {
     }
   }
 
-  /** La boulangère enfourne jusqu'à `maxWood` bûches. */
-  private bake(sim: Sim, a: Agent, maxWood: number) {
-    const inv = this.inv(a);
-    const wood = Math.min(maxWood, inv.bois);
-    if (!wood) return;
-    inv.bois -= wood;
-    inv.pain += wood * BREAD_PER_WOOD;
-    sim.emit('life.work', [a.id], `🍞 ${a.name} sort ${wood * BREAD_PER_WOOD} pains du four.`, { work: 'pain', qty: wood * BREAD_PER_WOOD });
-  }
-
-  /** Bûches enfournées le matin : assez pour nourrir tout le village (6 pains par bûche). */
-  private batchSize(sim: Sim) {
-    const bakers = Object.values(sim.world.agents).filter((a) => a.role === 'BOULANGER').length || 1;
-    return Math.max(BAKES_PER_BATCH, Math.ceil(Object.keys(sim.world.agents).length / (4 * bakers)));
-  }
-
-  /** La boulangerie la mieux fournie (s'il y en a plusieurs). */
-  private bestBaker(sim: Sim, buyer: Agent) {
-    return Object.values(sim.world.agents)
-      .filter((b) => b.role === 'BOULANGER' && b.id !== buyer.id)
-      .sort((x, y) => this.inv(y).pain - this.inv(x).pain)[0];
-  }
-
   fallSick(sim: Sim, a: Agent) {
     const n = this.needs(a);
     if (n.sante < 0.6) return;
@@ -326,7 +277,7 @@ export class Daily {
     // La nuit, on rentre et on dort… sauf le vagabond, qui a d'autres projets.
     if (night) {
       // Le vagabond vole par habitude ; un habitant peu honnête et affamé, sans pain ni sou, peut craquer.
-      const desperate = a.personality.honesty < 0.55 && n.satiete < 0.3 && inv.pain === 0 && inv.pieces < BREAD_PRICE;
+      const desperate = a.personality.honesty < 0.55 && n.satiete < 0.3 && inv.pain === 0 && inv.pieces < PRICES.pain;
       const urge = a.role === 'VOLEUR' ? (n.satiete < 0.6 ? 0.5 : 0.2) : desperate ? 0.35 : 0;
       if (urge && home && hour >= 1 && hour < 3 && Math.random() < urge) {
         const target = this.richestHouse(sim, a);
@@ -354,32 +305,17 @@ export class Daily {
     if (n.sante < 0.5 && healer && healer.id !== a.id && this.trip(sim, a, healer.houseId, 'soin', 0.7)) return;
 
     // Faim et plus de pain : à la boulangerie.
-    const baker = this.bestBaker(sim, a);
-    const broke = inv.pieces < BREAD_PRICE && n.satiete < 0.25;
-    if (canShop && n.satiete < 0.55 && inv.pain === 0 && (inv.pieces >= BREAD_PRICE || broke) && baker && baker.id !== a.id && hour < 19) {
+    const bakery = sim.economy.bestBakery(sim.world);
+    const broke = inv.pieces < PRICES.pain && n.satiete < 0.25;
+    if (canShop && n.satiete < 0.55 && inv.pain === 0 && (inv.pieces >= PRICES.pain || broke) && bakery && hour < 19) {
       this.nextShop.set(a.id, sim.clock.tick + 30);
-      if (this.trip(sim, a, baker.houseId, 'acheter', 0.4)) return;
-    }
-
-    // Boulanger et forgeron à court de bois : ils vont en acheter.
-    const lowWood = a.role === 'BOULANGER' ? inv.bois < this.batchSize(sim) : inv.bois === 0;
-    if (canShop && (a.role === 'BOULANGER' || a.role === 'FORGERON') && lowWood && inv.pieces >= 2 * WOOD_PRICE && hour < 17) {
-      this.nextShop.set(a.id, sim.clock.tick + 30);
-      const seller = Object.values(sim.world.agents)
-        .filter((x) => x.id !== a.id && x.role !== 'BOULANGER' && x.role !== 'FORGERON' && this.inv(x).bois >= 2).sort((x, y) => this.inv(y).bois - this.inv(x).bois)[0];
-      if (seller && this.trip(sim, a, seller.houseId, 'acheter', 0.4)) return;
-    }
-
-    // Sans le sou pour acheter du bois, le boulanger va le couper lui-même.
-    if (a.role === 'BOULANGER' && lowWood && inv.pieces < 2 * WOOD_PRICE && hour >= 8 && hour < 15 && !this.cutToday.has(a.id) && sim.clock.tick >= this.forestClosedUntil) {
-      this.cutToday.add(a.id);
-      if (this.trip(sim, a, 'foret', 'travail', 1.5)) return;
+      if (this.trip(sim, a, bakery.houseId, 'acheter', 0.4)) return;
     }
 
     // L'aubergiste va chercher le pain du soir à 8 h.
-    if (a.role === 'AUBERGISTE' && canShop && hour >= 8 && hour < 10 && inv.pain < 3 && baker && inv.pieces >= 3) {
+    if (a.role === 'AUBERGISTE' && canShop && hour >= 8 && hour < 10 && inv.pain < 3 && bakery && inv.pieces >= 2 * PRICES.pain) {
       this.nextShop.set(a.id, sim.clock.tick + 200);
-      if (this.trip(sim, a, baker.houseId, 'acheter', 0.4)) return;
+      if (this.trip(sim, a, bakery.houseId, 'acheter', 0.4)) return;
     }
 
     // Le crieur annonce les nouvelles sur la place à 9 h.
@@ -412,12 +348,6 @@ export class Daily {
     if (job && sim.economy.isPresent(a.id) && hour >= WORK_HOURS[0] && hour < WORK_HOURS[0] + 1 && !this.cutToday.has(a.id)) {
       this.cutToday.add(a.id);
       if (this.trip(sim, a, job.houseId, 'travail', WORK_HOURS[1] - hour)) return;
-    }
-
-    // Le matin, les bûcherons partent en forêt.
-    if (WOODCUTTERS.includes(a.role) && hour >= 7 && hour < 11 && !this.cutToday.has(a.id) && sim.clock.tick >= this.forestClosedUntil && Math.random() < 0.35) {
-      this.cutToday.add(a.id);
-      if (this.trip(sim, a, 'foret', 'travail', 1.5)) return;
     }
 
     // L'après-midi, chacun son loisir : pêche, cueillette, promenade… ou une pensée à la fenêtre.
@@ -458,39 +388,10 @@ export class Daily {
     const inv = this.inv(a);
     switch (purpose) {
       case 'acheter': {
-        if (!owner) break;
-        const oi = this.inv(owner);
-        if (owner.role === 'BOULANGER') {
-          const wanted = a.role === 'AUBERGISTE' ? 4 : 2;
-          const qty = Math.min(wanted, oi.pain - BAKER_RESERVE, Math.floor(inv.pieces / BREAD_PRICE));
-          if (qty <= 0 && inv.pieces < BREAD_PRICE && oi.pain > BAKER_RESERVE && (owner.opinions[a.id] ?? 0) > -0.1) {
-            oi.pain--;
-            inv.pain++;
-            sim.emit('life.trade', [owner.id, a.id], `🤲 ${owner.name} offre un pain à ${a.name}, qui n’a plus un sou.`, { item: 'pain', qty: 1, gift: true });
-            sim.adjustOpinion(a.id, owner.id, 0.15, 'Du pain offert quand je n’avais rien');
-            break;
-          }
-          if (qty > 0) {
-            oi.pain -= qty;
-            inv.pain += qty;
-            inv.pieces -= qty * BREAD_PRICE;
-            oi.pieces += qty * BREAD_PRICE;
-            sim.emit('life.trade', [a.id, owner.id], `🥖 ${a.name} achète ${qty} pain${qty > 1 ? 's' : ''} chez ${owner.name}.`, { item: 'pain', qty });
-          } else {
-            sim.emit('life.trade', [a.id, owner.id], `😠 Plus de pain chez ${owner.name} ! ${a.name} repart le ventre vide.`, { item: 'pain', qty: 0 });
-            sim.adjustOpinion(a.id, owner.id, -0.05);
-            this.nextShop.set(a.id, sim.clock.tick + RETRY_TICKS);
-          }
-        } else {
-          // Achat de bois chez un bûcheron.
-          const qty = Math.min(4, oi.bois - 1, Math.floor(inv.pieces / WOOD_PRICE));
-          if (qty > 0) {
-            oi.bois -= qty;
-            inv.bois += qty;
-            inv.pieces -= qty * WOOD_PRICE;
-            oi.pieces += qty * WOOD_PRICE;
-            sim.emit('life.trade', [a.id, owner.id], `🪵 ${a.name} achète ${qty} bûche${qty > 1 ? 's' : ''} à ${owner.name}.`, { item: 'bois', qty });
-          }
+        const got = sim.economy.buyBread(sim, a);
+        if (!got) {
+          sim.emit('life.trade', [a.id], `😠 Plus de pain à la boulangerie ! ${a.name} repart le ventre vide.`, { item: 'pain', qty: 0 });
+          this.nextShop.set(a.id, sim.clock.tick + RETRY_TICKS);
         }
         break;
       }
