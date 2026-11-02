@@ -61,10 +61,12 @@ Le but est qu'en revenant, Cruz trouve **un village différent** : qui a grandi,
   - Les nouvelles entités (lieux de travail, emplois, salaires) doivent quand même rester de simples données sérialisables en JSON, comme le reste de `WorldState`, pour ne pas fermer cette porte.
 - **Messages (choix de Claude).** Avec des routes en réseau (embranchements, ponts partagés), un messager marche le long du réseau **jusqu'à son destinataire**. Il n'y a plus de relais de maison en maison (`Sim.relay`, `graph.nextHop`). Les carrefours et les ponts sont de simples points de passage. Un lieu de travail est un point du réseau, mais ne reçoit pas de messages : on écrit à des personnes.
 - **La gazette avec 4 fondateurs (choix de Claude).** Au début, une même personne peut tenir plusieurs étapes de la gazette : trouver le sujet, écrire, relire, juger. Le maire peut même publier seul. Les rôles de la rédaction se répartissent sur des personnes différentes à mesure que le village grandit.
-- **Le mode IA à 50 habitants (proposé par Claude, accepté par Cruz).**
-  - L'IA ne pilote qu'**une dizaine de personnages principaux** : le maire, l'équipe de la gazette et quelques autres. Les autres habitants suivent les règles gratuites.
-  - L'emploi, le vol et la vie quotidienne restent des règles de la simulation pour tout le monde.
-  - Le vote reste une décision de l'IA pour les personnages qu'elle pilote.
+- **Le mode IA (décidé par Cruz).**
+  - Le grand village tourne **entièrement en mode gratuit** par défaut.
+  - L'IA devient au mieux une option : à la création, on peut désigner **un seul villageois** piloté par l'IA (Claude ou une clé API). Il décide, parle et vote avec son cerveau IA ; tous les autres suivent les règles gratuites.
+  - Le menu 🧠 actuel, qui fait basculer tout le village sur l'IA, est retiré ou ramené à ce choix d'un seul agent.
+  - L'emploi, le vol et la vie quotidienne restent des règles de la simulation pour tout le monde, y compris pour l'agent IA.
+  - Si cette option complique trop le projet, elle peut glisser plus tard : le mode gratuit est la priorité.
 
 ## Hors périmètre
 
