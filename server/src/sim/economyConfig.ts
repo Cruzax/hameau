@@ -23,7 +23,13 @@ export const OUTPUT_PER_WORKER = { ble: 6, bois: 4, farine: 8, pain: 16, outils:
 export const BREAD_PER_FLOUR = 3;
 export const BREAD_PER_WOOD = 6;
 /** Prix de vente, en pièces. */
-export const PRICES = { ble: 0.5, farine: 1, bois: 1, outils: 6, pain: 1 } as const;
+export const PRICES = { ble: 0.65, farine: 1.3, bois: 1.25, outils: 8, pain: 1 } as const;
+/** Avec des outils, la ferme et la scierie produisent ce bonus en plus… */
+export const TOOL_BONUS = 0.5;
+/** …et chaque employé use cette part d'outil par jour. */
+export const TOOL_WEAR = 0.15;
+/** Réserve d'outils visée par employé (ferme, scierie). */
+export const TOOLS_PER_WORKER = 0.5;
 /** Pain du potager, chaque matin, pour un adulte sans emploi. */
 export const SUBSISTENCE_BREAD = 1;
 /** Pain du potager familial pour un enfant. */

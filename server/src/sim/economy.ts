@@ -6,7 +6,7 @@ import {
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
   CHILD_BREAD, OUTPUT_GOOD, OWNER_KEEPS, OWNER_REFILL, STOCK_CAP, VILLAGE_TILL_FLOOR,
   BANKRUPT_AFTER_DAYS, BREAD_NEED_PER_PERSON, BREAD_PER_SLOT, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
-  ALMS, BONUS_MAX, BONUS_SHARE, POOR_BELOW, TAX_FROM, TAX_RATE,
+  ALMS, BONUS_MAX, BONUS_SHARE, POOR_BELOW, TAX_FROM, TAX_RATE, TOOL_BONUS, TOOL_WEAR, TOOLS_PER_WORKER,
 } from './economyConfig';
 
 /** Qui achète quoi à qui, et combien par employé (stock visé). */
@@ -15,6 +15,9 @@ const SUPPLY: { buyer: WorkplaceKind; good: Good; seller: WorkplaceKind; perWork
   { buyer: 'boulangerie', good: 'farine', seller: 'moulin', perWorker: OUTPUT_PER_WORKER.pain / BREAD_PER_FLOUR },
   { buyer: 'boulangerie', good: 'bois', seller: 'scierie', perWorker: OUTPUT_PER_WORKER.pain / BREAD_PER_WOOD },
   { buyer: 'forge', good: 'bois', seller: 'scierie', perWorker: OUTPUT_PER_WORKER.outils },
+  // Les outils de la forge rendent la ferme et la scierie plus productives ; ils s'usent.
+  { buyer: 'ferme', good: 'outils', seller: 'forge', perWorker: TOOLS_PER_WORKER },
+  { buyer: 'scierie', good: 'outils', seller: 'forge', perWorker: TOOLS_PER_WORKER },
 ];
 
 /** Les récoltes suivent les saisons : maigres l'hiver, généreuses l'été. */
@@ -220,8 +223,8 @@ export class Economy {
       if (output && (st[output] ?? 0) >= cap) continue;
       const add = (g: Good, q: number) => (st[g] = (st[g] ?? 0) + q);
       switch (wp.kind) {
-        case 'ferme': add('ble', Math.round(OUTPUT_PER_WORKER.ble * n * HARVEST[seasonOf(sim.clock.day)])); break;
-        case 'scierie': add('bois', OUTPUT_PER_WORKER.bois * n); break;
+        case 'ferme': add('ble', Math.round(OUTPUT_PER_WORKER.ble * n * HARVEST[seasonOf(sim.clock.day)] * this.tooled(wp, n))); break;
+        case 'scierie': add('bois', Math.round(OUTPUT_PER_WORKER.bois * n * this.tooled(wp, n))); break;
         case 'moulin': {
           const q = Math.min(st.ble ?? 0, OUTPUT_PER_WORKER.farine * n);
           add('ble', -q);
@@ -245,6 +248,14 @@ export class Economy {
         }
       }
     }
+  }
+
+  /** Bonus de production si le lieu a des outils (qui s'usent au passage), sinon 1. */
+  private tooled(wp: Workplace, workers: number): number {
+    const tools = wp.stock.outils ?? 0;
+    if (tools < 1) return 1;
+    wp.stock.outils = Math.max(0, tools - TOOL_WEAR * workers);
+    return 1 + TOOL_BONUS;
   }
 
   /** Le soir : commerce, production, puis paie ; caisse vide trop longtemps = renvoi ; surplus au patron. */
