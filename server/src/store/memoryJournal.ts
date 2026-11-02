@@ -11,6 +11,13 @@ export class MemoryJournal {
     this.seq = 0;
   }
 
+  /** Reprise d'une partie sauvegardée. */
+  load(events: SimEvent[]) {
+    this.events.length = 0;
+    for (const e of events) this.events.push(e);
+    this.seq = events.at(-1)?.seq ?? 0;
+  }
+
   append(e: Omit<SimEvent, 'seq' | 'at'>): SimEvent {
     const line = JSON.stringify({ ...e, seq: ++this.seq, at: new Date().toISOString() });
     // Copie figée : l'export montre l'état au moment de l'événement, pas l'état final du monde.

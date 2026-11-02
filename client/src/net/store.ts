@@ -16,6 +16,8 @@ interface HameauState {
   events: SimEvent[];
   bubbles: Record<AgentId, Bubble>;
   connected: boolean;
+  /** Partie de la dernière visite reprise (true), village neuf (false), pas encore su (null). */
+  restored: boolean | null;
   /** Instant (performance.now) du dernier tick reçu : sert à interpoler les messagers. */
   tickAt: number;
   /** En replay, le direct est ignoré et le monde est reconstruit depuis le journal. */
@@ -32,6 +34,7 @@ export const useHameau = create<HameauState>(() => ({
   events: [],
   bubbles: {},
   connected: false,
+  restored: null,
   tickAt: 0,
   mode: 'live',
   replay: null,

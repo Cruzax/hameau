@@ -29,6 +29,7 @@ import { gazetteStaff, HEADLINE_MIN, pickHeadline, score, SMALL_VILLAGE, SMALL_V
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
+import { restoreState, stateOf } from './save';
 
 /** Unités de monde parcourues par un messager à chaque tick. */
 const WALK_SPEED = 0.5;
@@ -76,6 +77,16 @@ const NEWSWORTHY = new Set<SimEvent['type']>([
 /** Variation d'opinion à partir de laquelle on l'inscrit au journal. */
 const NOTABLE_OPINION = 0.15;
 
+/** À changer quand une ancienne sauvegarde ne peut plus être reprise telle quelle. */
+export const SAVE_VERSION = 1;
+
+export interface SimSave {
+  version: number;
+  world: WorldState;
+  events: SimEvent[];
+  state: Record<string, unknown>;
+}
+
 interface Pending { due: number; agentId: AgentId; actions: Action[]; deliverSelf?: Message }
 
 export class Sim {
@@ -118,8 +129,9 @@ export class Sim {
 
   // ─── Boucle ────────────────────────────────────────────────────────────────
 
-  start() {
-    this.begin();
+  /** Lance la simulation ; une partie reprise continue sa journée sans recommencer le matin. */
+  start(resumed = false) {
+    if (!resumed) this.begin();
     this.schedule();
   }
 
@@ -569,6 +581,44 @@ export class Sim {
     this.emit('llm.config', [], '🧠 Cerveau des agents : gratuit (règles scriptées).', { provider: llm.provider, ok: true });
     this.startDay();
     this.flush();
+  }
+
+  /** Tout ce qu'il faut pour reprendre la partie plus tard (sans les fonctions, copiable tel quel). */
+  save(): SimSave {
+    return {
+      version: SAVE_VERSION,
+      world: this.world,
+      events: this.journal.events,
+      state: stateOf({
+        politics: this.politics, life: this.life, economy: this.economy,
+        daily: { ...stateOf(this.daily), todays: this.daily.todaysForSave() },
+        pending: this.pending, nextMsgId: this.nextMsgId,
+        coveredNews: this.coveredNews, issueSince: this.issueSince, issuesToday: this.issuesToday,
+      }),
+    };
+  }
+
+  /** Reprend une partie sauvegardée. Renvoie false si la sauvegarde vient d'une version trop différente. */
+  load(save: SimSave): boolean {
+    if (save.version !== SAVE_VERSION) return false;
+    for (const k of Object.keys(this.world)) delete (this.world as unknown as Record<string, unknown>)[k];
+    Object.assign(this.world, save.world);
+    this.journal.load(save.events);
+    const s = save.state as Record<string, unknown>;
+    this.politics = new Politics();
+    this.life = new Life();
+    this.daily = new Daily();
+    this.economy = new Economy();
+    for (const k of ['politics', 'life', 'daily', 'economy'] as const) restoreState(this[k], s[k] as Record<string, unknown>);
+    this.daily.relinkTodays();
+    this.pending.length = 0;
+    this.pending.push(...(s.pending as Pending[]));
+    this.nextMsgId = s.nextMsgId as number;
+    this.coveredNews = s.coveredNews as Set<number>;
+    this.issueSince = s.issueSince as number | null;
+    this.issuesToday = s.issuesToday as number;
+    this.outbox = [];
+    return true;
   }
 
   broadcastPatch(world: Partial<WorldState>) {

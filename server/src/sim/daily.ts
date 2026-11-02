@@ -80,6 +80,21 @@ function talkSituation(sim: Sim, speaker: Agent, listener: Agent) {
   };
 }
 
+/** La fête ou le marché du calendrier pour ce jour de la semaine, s'il y en a un. */
+function calendarEvent(today: string): VillageEvent | undefined {
+  const cal = CALENDAR[today];
+  if (!cal) return undefined;
+  return {
+    id: `calendrier-${today}`,
+    weight: 0,
+    run: (_s, h) => {
+      h.gather(cal.hour, cal.until);
+      h.moodAll(cal.mood);
+      return cal.text;
+    },
+  };
+}
+
 export class Daily {
   readonly justice = new Justice();
   private lastNeedsPatch = 0;
@@ -651,21 +666,21 @@ export class Daily {
     const today = dayName(sim.clock.day);
     const cal = CALENDAR[today];
     sim.emit('calendar', [], `📅 ${today[0].toUpperCase()}${today.slice(1)}, jour ${sim.clock.day}.`, { dayName: today });
-    if (cal) {
-      this.todays.push({
-        hour: cal.hour,
-        done: false,
-        ev: {
-          id: `calendrier-${today}`,
-          weight: 0,
-          run: (_s, h) => {
-            h.gather(cal.hour, cal.until);
-            h.moodAll(cal.mood);
-            return cal.text;
-          },
-        },
-      });
-    }
+    if (cal) this.todays.push({ hour: cal.hour, done: false, ev: calendarEvent(today)! });
+  }
+
+  /** Le programme du jour pour une sauvegarde : les événements par leur nom (pas de fonctions). */
+  todaysForSave() {
+    return this.todays.map((t) => ({ hour: t.hour, done: t.done, id: t.ev.id }));
+  }
+
+  /** Après une reprise : retrouve chaque événement du programme à partir de son nom. */
+  relinkTodays() {
+    const saved = this.todays as unknown as { hour: number; done: boolean; id: string }[];
+    this.todays = saved.flatMap((t) => {
+      const ev = EVENTS.find((e) => e.id === t.id) ?? calendarEvent(t.id.replace(/^calendrier-/, ''));
+      return ev ? [{ hour: t.hour, done: t.done, ev }] : [];
+    });
   }
 
   /** Une fête sur la place le lendemain à 17 h (mariage, naissance…). */

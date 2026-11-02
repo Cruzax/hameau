@@ -30,12 +30,22 @@ function connectWorker(): () => void {
       journalWaiter = null;
       return;
     }
+    if (msg.type === 'save.status') {
+      useHameau.setState({ restored: msg.restored });
+      return;
+    }
     handle(msg);
   };
   useHameau.setState({ connected: true, send: (cmd: ClientToServer) => w.postMessage(cmd satisfies WorkerRequest) });
   // Après un replay : on redemande l'état du monde (la simulation, elle, n'a jamais cessé de tourner).
   reopenNow = () => w.postMessage({ type: 'snapshot.request' } satisfies WorkerRequest);
+  // On quitte l'onglet (ou on le cache) : la partie est sauvegardée avant que le navigateur ne coupe tout.
+  const saveNow = () => document.visibilityState === 'hidden' && w.postMessage({ type: 'save.request' } satisfies WorkerRequest);
+  document.addEventListener('visibilitychange', saveNow);
+  window.addEventListener('pagehide', saveNow);
   return () => {
+    document.removeEventListener('visibilitychange', saveNow);
+    window.removeEventListener('pagehide', saveNow);
     w.terminate();
     worker = null;
     useHameau.setState({ connected: false, send: () => {} });
@@ -66,6 +76,7 @@ function connectServer(): () => void {
     ws.onopen = () =>
       useHameau.setState({
         connected: true,
+        restored: false,
         send: (cmd: ClientToServer) => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(cmd)),
       });
     ws.onclose = () => {

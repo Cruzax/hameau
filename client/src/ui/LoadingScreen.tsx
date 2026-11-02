@@ -13,6 +13,7 @@ const TIPS = [
   'Les plus pauvres sont parfois tentés de voler. Le garde veille.',
   'Une journée au village dure cinq minutes. Accélère avec ×2, ×4, ×8.',
   'Nouvelle histoire : compose tes quatre fondateurs, trait par trait.',
+  'Ton village est gardé dans ce navigateur : tu le retrouves à la prochaine visite.',
 ];
 
 /** Temps minimal d'affichage, pour que l'écran ne clignote pas quand tout va vite. */
@@ -20,6 +21,7 @@ const MIN_MS = 1800;
 
 export function LoadingScreen() {
   const connected = useHameau((s) => s.connected);
+  const restored = useHameau((s) => s.restored);
   const [minElapsed, setMinElapsed] = useState(false);
   const [gone, setGone] = useState(false);
   const [tip, setTip] = useState(() => Math.floor(Math.random() * TIPS.length));
@@ -33,13 +35,14 @@ export function LoadingScreen() {
     };
   }, []);
 
-  const ready = connected && minElapsed;
+  const ready = connected && minElapsed && restored !== null;
   useEffect(() => {
     if (!ready) return;
     const t = setTimeout(() => {
       setGone(true);
-      // Chaque visite repart d'un village neuf : on propose tout de suite de composer ses fondateurs.
-      useUI.getState().set({ starting: true });
+      // Pas de partie gardée : on propose tout de suite de composer ses fondateurs.
+      // Sinon on reprend directement ; « Nouvelle histoire » dans le menu permet de recommencer.
+      if (!restored) useUI.getState().set({ starting: true });
     }, 700); // le temps du fondu
     return () => clearTimeout(t);
   }, [ready]);
@@ -61,7 +64,7 @@ export function LoadingScreen() {
         </div>
       </div>
       <h1 className="loading__title">Hameau</h1>
-      <p className="loading__state">{connected ? 'Le village se réveille…' : 'On allume les lanternes…'}</p>
+      <p className="loading__state">{!connected || restored === null ? 'On allume les lanternes…' : restored ? 'On retrouve ton village…' : 'Le village se réveille…'}</p>
       <p className="loading__tip" key={tip}>{TIPS[tip]}</p>
     </div>
   );
