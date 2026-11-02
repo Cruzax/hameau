@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type PanelId = 'journal' | 'gazette' | 'habitants' | 'relations' | 'dieu';
+export type PanelId = 'journal' | 'gazette' | 'habitants' | 'relations' | 'dieu' | 'maison';
 
 export interface PanelState {
   x: number;
@@ -30,6 +30,7 @@ function defaults(): Record<PanelId, PanelState> {
     habitants: { x: RAIL + 12, y: Math.max(TOP, vh - 250), w: 250, h: 234, open: true, collapsed: false, z: 1 },
     relations: { x: RAIL + 274, y: Math.max(TOP, vh - 250), w: 300, h: 234, open: true, collapsed: false, z: 1 },
     dieu: { x: RAIL + 12, y: TOP, w: 330, h: Math.max(300, vh - TOP - 270), open: false, collapsed: false, z: 4 },
+    maison: { x: Math.max(RAIL + 12, right - 330 - GAP), y: TOP, w: 320, h: Math.min(460, vh - TOP - 16), open: false, collapsed: false, z: 5 },
   };
 }
 

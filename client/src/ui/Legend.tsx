@@ -2,6 +2,7 @@ import { ROLE_COLOR, ROLE_LABEL, type Agent, type WorldState } from '@hameau/sha
 import { useHameau } from '../net/store';
 import { Panel } from './Panel';
 import { useUI } from './uiStore';
+import { openHouseSheet } from '../scene/House';
 
 /** -1 (rouge) → 0 (crème) → +1 (vert). */
 function opinionColor(x: number) {
@@ -47,7 +48,10 @@ export function Habitants() {
             <button
               className="person"
               title="Centrer la caméra sur sa maison"
-              onClick={() => setUI({ shot: 'maison', focusHouse: a.houseId })}
+              onClick={() => {
+                setUI({ shot: 'maison', focusHouse: a.houseId });
+                openHouseSheet(a.houseId);
+              }}
             >
               <span className="person__dot" style={{ background: ROLE_COLOR[a.role] }} />
               <span className="person__name">{a.name}</span>

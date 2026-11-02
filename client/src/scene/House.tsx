@@ -3,6 +3,8 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { Color, ExtrudeGeometry, MeshStandardMaterial, Shape, type Group, type Mesh } from 'three';
 import { ROLE_COLOR, ROLE_LABEL, type Agent, type House as HouseData, type HouseStyle } from '@hameau/shared';
+import { useUI } from '../ui/uiStore';
+import { useLayout } from '../ui/layoutStore';
 
 interface Dims { w: number; d: number; h: number; roof: number }
 
@@ -467,6 +469,14 @@ export const WORKPLACE_LABEL: Record<string, string> = {
   ferme: 'Ferme', moulin: 'Moulin', scierie: 'Scierie', forge: 'Forge', boulangerie: 'Boulangerie', auberge: 'Auberge', herboristerie: 'Herboristerie',
 };
 
+/** Ouvre la fiche d'une maison (ou d'un lieu de travail) au premier plan. */
+export function openHouseSheet(id: string) {
+  useUI.getState().set({ selectedHouse: id });
+  const layout = useLayout.getState();
+  layout.update('maison', { open: true, collapsed: false });
+  layout.focus('maison');
+}
+
 /** Les maisons apparues en cours de partie « poussent » du sol (construction). */
 const BUILD_SECONDS = 1.6;
 const LOAD_GRACE_MS = 4000;
@@ -490,7 +500,24 @@ export function House({ house, owner, isMayor, workplace }: { house: HouseData; 
   const labelY = dims.h + dims.roof + (house.style === 'mairie' ? 3.1 : 1.3);
 
   return (
-    <group ref={root} position={[house.position.x, 0, house.position.z]} rotation={[0, house.rotation, 0]} name={house.id}>
+    <group
+      ref={root}
+      position={[house.position.x, 0, house.position.z]}
+      rotation={[0, house.rotation, 0]}
+      name={house.id}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.delta > 4) return; // un glisser de caméra, pas un clic
+        openHouseSheet(house.id);
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = '';
+      }}
+    >
       {/* Soubassement en pierre et marche devant la porte */}
       <Box args={[dims.w + 0.3, 0.25, dims.d + 0.3]} position={[0, 0.125, 0]} color={STONE} />
       <Box args={[1.1, 0.14, 0.45]} position={[0, 0.07, dims.d / 2 + 0.35]} color={STONE_DARK} />
