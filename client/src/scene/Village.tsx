@@ -17,7 +17,12 @@ import { NatureSpots } from './NatureSpots';
 import { Storm } from './Storm';
 import { Flood } from './Flood';
 import { WellGlow } from './WellGlow';
+import { Treasures } from './Treasures';
+import { Tornado } from './Tornado';
+import { useUI } from '../ui/uiStore';
 import { approach, effectLevel, nightNow } from './effectLevel';
+import { riverPath } from './terrainMath';
+import { distToPolyline } from '@hameau/shared';
 import { WINDOW_MATERIAL } from './House';
 
 const SKY = new Color('#f4d9b3');
@@ -86,6 +91,17 @@ export function Village() {
   const agents = useHameau((s) => s.world.agents);
   const mayorId = useHameau((s) => s.world.mayorId);
   const send = useHameau((s) => s.send);
+  const godTool = useUI((s) => s.godTool);
+  // Un trésor à poser : le prochain clic sur le sol ou une route le dépose là.
+  const pick = godTool === 'treasure'
+    ? (position: { x: number; z: number }) => {
+        // Pas dans l'eau : personne n'irait le pêcher. L'outil reste armé, on reclique ailleurs.
+        if (distToPolyline(position, riverPath(terrain)) < terrain.river.width / 2 + 0.8) return;
+        send({ type: 'god.treasure', position });
+        useUI.getState().set({ godTool: null });
+        document.body.style.cursor = '';
+      }
+    : undefined;
   const roads = useMemo(() => Object.values(roadsById), [roadsById]);
   // Les carrefours ne se dessinent pas : la route suffit.
   const houses = Object.values(housesById).filter((h) => h.kind !== 'carrefour');
@@ -103,12 +119,12 @@ export function Village() {
         maxPolarAngle={1.15}
       />
 
-      <Terrain terrain={terrain} />
+      <Terrain terrain={terrain} onPick={pick} />
       <River terrain={terrain} />
       <Flood terrain={terrain} />
       <Plaza terrain={terrain} />
       <WellGlow terrain={terrain} />
-      <Roads roads={roads} houses={housesById} terrain={terrain} onToggle={(roadId) => send({ type: 'god.road.cut', roadId })} />
+      <Roads roads={roads} houses={housesById} terrain={terrain} onPick={pick} onToggle={(roadId) => send({ type: 'god.road.cut', roadId })} />
       <Trees terrain={terrain} houses={housesById} roads={roads} />
 
       {houses.map((h) => {
@@ -118,6 +134,8 @@ export function Village() {
         return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} workplace={workplace} />;
       })}
 
+      <Treasures />
+      <Tornado />
       <NatureSpots />
       <Residents />
 

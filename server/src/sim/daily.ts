@@ -9,10 +9,12 @@ import {
   type PlaceId,
   type Role,
   type TripPurpose,
+  type EffectKind,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { isAdult, placeName as workplaceName } from './economy';
 import { PRICES, WORK_HOURS } from './economyConfig';
+import { homeOf } from './disasters';
 import { isActive } from './effects';
 import { findPath } from './paths';
 import { createRumor, hottestRumor, rumorToShare, SLANDERS, tellRumor } from './rumors';
@@ -103,6 +105,8 @@ export class Daily {
   private sangToday = false;
   /** Tant que la forêt est « fermée » (loup), personne n'y va. */
   forestClosedUntil = 0;
+  /** Le phénomène météo prévu aujourd'hui (tiré le matin), s'il y en a un. */
+  weatherPlan: { kind: EffectKind; hour: number } | null = null;
   /** Événements du jour, avec leur heure. */
   private todays: { hour: number; ev: VillageEvent; done: boolean }[] = [];
   /** Qui est déjà allé couper du bois aujourd'hui. */
@@ -124,7 +128,7 @@ export class Daily {
   /** Lieu où se trouve l'habitant, ou null s'il marche. */
   placeOf(a: Agent): PlaceId | null {
     const l = a.location ?? { kind: 'home' };
-    if (l.kind === 'home') return a.houseId;
+    if (l.kind === 'home') return homeOf(a);
     if (l.kind === 'at') return l.place;
     return null;
   }
@@ -191,7 +195,7 @@ export class Daily {
   /** Retour à la maison (ou on reste sur place si la route est coupée). */
   private goHome(sim: Sim, a: Agent) {
     if (this.isHome(a)) return;
-    if (!this.trip(sim, a, a.houseId, 'retour', 0)) {
+    if (!this.trip(sim, a, homeOf(a), 'retour', 0)) {
       const l = a.location;
       if (l?.kind === 'at') l.until = sim.clock.tick + 20; // bloqué : on réessaiera
     }
@@ -261,7 +265,7 @@ export class Daily {
     const l = a.location;
     if (!l) return;
     if (l.kind === 'walking' && (sim.clock.tick - l.startTick) * l.speed >= l.length) {
-      if (l.to === a.houseId) a.location = { kind: 'home' };
+      if (l.to === homeOf(a)) a.location = { kind: 'home' };
       else a.location = { kind: 'at', place: l.to, purpose: l.purpose, until: sim.clock.tick + (this.stays.get(a.id) ?? 20) };
       sim.touchAgents();
       this.arrive(sim, a, l.to, l.purpose);

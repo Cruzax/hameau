@@ -499,6 +499,41 @@ export function House({ house, owner, isMayor, workplace }: { house: HouseData; 
   const chimney = CHIMNEY[house.style];
   const labelY = dims.h + dims.roof + (house.style === 'mairie' ? 3.1 : 1.3);
 
+  // Emportée par la tornade : un tas de gravats et de poutres, jusqu'à la reconstruction.
+  if (house.ruined) {
+    return (
+      <group
+        position={[house.position.x, 0, house.position.z]}
+        rotation={[0, house.rotation, 0]}
+        name={house.id}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.delta > 4) return;
+          openHouseSheet(house.id);
+        }}
+      >
+        <Box args={[dims.w + 0.3, 0.25, dims.d + 0.3]} position={[0, 0.125, 0]} color={STONE} />
+        <Box args={[dims.w * 0.9, 0.6, 0.35]} position={[0, 0.5, -dims.d / 2 + 0.2]} color={house.wallColor} rotation={[0, 0, 0.05]} />
+        <Box args={[0.35, 0.9, dims.d * 0.6]} position={[-dims.w / 2 + 0.2, 0.6, -0.2]} color={house.wallColor} rotation={[0.08, 0, 0]} />
+        <Box args={[dims.w * 0.8, 0.12, 0.18]} position={[0.2, 0.45, 0.3]} color={BEAM} rotation={[0, 0.6, 0.25]} />
+        <Box args={[dims.w * 0.7, 0.12, 0.18]} position={[-0.3, 0.55, 0.6]} color={BEAM} rotation={[0, -0.4, -0.2]} />
+        <Box args={[1.2, 0.08, 1.0]} position={[0.6, 0.32, -0.3]} color={house.roofColor} rotation={[0.3, 0.4, 0.15]} />
+        <Box args={[0.9, 0.08, 0.8]} position={[-0.5, 0.3, 0.2]} color={house.roofColor} rotation={[-0.25, 1.1, 0.1]} />
+        {[[-0.8, 0.9], [0.9, 0.6], [0.3, -0.9], [-0.2, 1.2]].map(([x, z], i) => (
+          <Box key={i} args={[0.35, 0.25, 0.3]} position={[x, 0.37, z]} color={STONE_DARK} rotation={[0, i, 0.2]} />
+        ))}
+        {owner && (
+          <Html position={[0, 2.2, 0]} center zIndexRange={[10, 0]}>
+            <div className="house-label">
+              <div className="house-label__role" style={{ background: '#6b5d4f' }}>🌪 En ruine</div>
+              <div className="house-label__name">{owner.name}</div>
+            </div>
+          </Html>
+        )}
+      </group>
+    );
+  }
+
   return (
     <group
       ref={root}

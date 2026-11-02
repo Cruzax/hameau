@@ -20,6 +20,11 @@ export function score(e: SimEvent): number {
   switch (e.type) {
     case 'mayor.elected': return p.kept ? 0 : 10;
     case 'trial.verdict': return 8;
+    case 'treasure.found': return 9;
+    case 'house.destroyed': return 9;
+    case 'house.rebuilt': return 4;
+    case 'god.gift': return (p as { kind?: string }).kind ? 6 : 4;
+    case 'world.effect': return (p as { phase?: string; effect?: { kind?: string } }).phase === 'start' && (p as { effect?: { kind?: string } }).effect?.kind === 'flood' ? 5 : 0;
     case 'crime.theft': return 6;
     case 'workplace.closed': return 6;
     case 'agent.born': return 5;

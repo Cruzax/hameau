@@ -28,8 +28,10 @@ import { Economy } from './economy';
 import { gazetteStaff, HEADLINE_MIN, pickHeadline, score, SMALL_VILLAGE, SMALL_VILLAGE_MIN, SPECIAL_EDITION } from './newsworthy';
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
-import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
+import { addAgent, buildRoad, cutOrReopenRoad, exileAgent, newWorkplace } from './god';
 import { restoreState, stateOf } from './save';
+import { briefsSince, mayorWord, weatherSince } from '../content/gazetteExtras';
+import { checkTreasures, placeTreasure, planWeather, rebuildRuins } from './disasters';
 
 /** Unités de monde parcourues par un messager à chaque tick. */
 const WALK_SPEED = 0.5;
@@ -168,6 +170,7 @@ export class Sim {
     if (NEWS_HOURS.some((h) => this.dayTick === Math.round(this.clock.ticksPerDay * dayFraction(h)))) this.newsDesk();
     this.daily.onTick(this);
     tickEffects(this);
+    checkTreasures(this);
     this.brain.onTick?.(this);
     this.flush();
   }
@@ -177,6 +180,8 @@ export class Sim {
   /** Tick où le numéro en cours a été lancé, ou null. */
   private issueSince: number | null = null;
   private issuesToday = 0;
+  /** L'événement qui a lancé le numéro en cours. */
+  private issueTopic: SimEvent | undefined;
 
   /** Chaque heure de la journée : s'il s'est passé quelque chose, le maire lance un numéro. */
   private newsDesk() {
@@ -192,6 +197,7 @@ export class Sim {
     if (!headline) return;
     this.coveredNews.add(headline.seq);
     this.issueSince = this.clock.tick;
+    this.issueTopic = headline;
     this.world.gazetteDraft = { day };
     this.brain.onNews?.(this, headline.text.replace(/^[^\p{L}]+/u, '').split(/[.!]/)[0].trim());
   }
@@ -200,6 +206,7 @@ export class Sim {
     this.emit('day.start', [], `☀️ Jour ${this.clock.day} — le village se réveille.`);
     this.world.gazetteDraft = { day: this.clock.day };
     this.issuesToday = 0;
+    this.daily.weatherPlan = planWeather(this);
     this.daily.morning(this);
     this.economy.morning(this);
     this.brain.onDayStart(this);
@@ -215,6 +222,7 @@ export class Sim {
     // Une grosse affaire n'est « étouffée » que si elle reste sans numéro le lendemain soir.
     const stifled = this.journal.events.some((e) => e.day === this.clock.day - 1 && score(e) >= 6 && !this.coveredNews.has(e.seq));
     this.politics.onDayEnd(this, { issues, stifled, hungry, paid: this.economy.paidToday });
+    rebuildRuins(this);
     if (this.lifeEnabled) {
       // Le voisinage rapproche : un peu d'estime en plus entre voisins directs, chaque soir.
       for (const a of Object.values(this.world.agents)) for (const n of neighbors(this.world, a.id)) this.adjustOpinion(a.id, n, 0.02);
@@ -301,8 +309,14 @@ export class Sim {
         const body = dossier?.edited ?? dossier?.draft;
         if (article && body && (article.body ?? '').length < body.length * 0.6) article.body = body;
         if (article && dossier) Object.assign(article, { topicBy: dossier.topicBy, writtenBy: dossier.draftBy, editedBy: dossier.editedBy });
+        // Autour de l'article : tout ce qui s'est passé depuis le numéro précédent.
+        const since = this.world.gazettes.at(-1)?.publishedTick ?? -1;
+        const window = this.journal.events.filter((e) => e.tick > since);
         const g: Gazette = {
           ...a.gazette,
+          briefs: briefsSince(window, this.issueTopic?.seq),
+          weather: weatherSince(window),
+          mayorWord: mayorWord(window, this.world),
           review: a.gazette.review ?? dossier?.review,
           day: this.clock.day,
           publishedTick: this.clock.tick,
@@ -509,11 +523,64 @@ export class Sim {
         this.brain.onInject?.(this, c.text);
         break;
       case 'god.effect': {
-        const text = { storm: 'Un violent orage s’abat sur le village', flood: 'La rivière déborde', well: 'Le puits de la place s’illumine mystérieusement' }[c.kind];
+        const text = { storm: 'Un violent orage s’abat sur le village', flood: 'La rivière déborde', well: 'Le puits de la place s’illumine mystérieusement', tornado: 'Une tornade traverse le village' }[c.kind];
         startEffect(this, c.kind);
         this.brain.onInject?.(this, text);
         break;
       }
+        break;
+      case 'god.treasure':
+        placeTreasure(this, c.position);
+        break;
+      case 'god.money': {
+        const a = this.agent(c.agentId);
+        if (!a) break;
+        const inv = (a.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
+        const delta = Math.max(c.delta, -inv.pieces);
+        inv.pieces += delta;
+        this.emit('god.gift', [a.id], delta >= 0
+          ? `🎁 ${delta} pièces tombent du ciel dans la poche de ${a.name} !`
+          : `💸 ${-delta} pièces s’envolent mystérieusement de la bourse de ${a.name}.`, { delta });
+        this.touchAgents();
+        break;
+      }
+      case 'god.harvest':
+        for (const a of Object.values(this.world.agents)) {
+          (a.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 }).pain += 3;
+          if (a.needs) a.needs.humeur = Math.min(1, a.needs.humeur + 0.2);
+        }
+        this.emit('god.gift', [], '🌾 Récolte miracle : chaque habitant trouve trois pains tout chauds sur le pas de sa porte !', { kind: 'harvest' });
+        this.touchAgents();
+        break;
+      case 'god.crash':
+        for (const wp of Object.values(this.world.workplaces)) wp.till = 0;
+        for (const a of Object.values(this.world.agents)) {
+          const inv = (a.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
+          inv.pieces = Math.floor(inv.pieces * 0.6);
+          if (a.needs) a.needs.humeur = Math.max(0, a.needs.humeur - 0.2);
+        }
+        this.emit('god.gift', [], '📉 Krach ! Les caisses des commerces sont vides et chacun a perdu une bonne part de ses économies.', { kind: 'crash' });
+        this.broadcastPatch({ workplaces: this.world.workplaces });
+        this.touchAgents();
+        break;
+      case 'god.workplace.open':
+        newWorkplace(this, c.kind, null);
+        break;
+      case 'god.love': {
+        const [a, b] = [this.agent(c.a), this.agent(c.b)];
+        if (!a || !b) break;
+        if (!this.life.canFallInLove(a, b)) {
+          this.emit('god.inject', [a.id, b.id], `💘 La flèche rate sa cible : entre ${a.name} et ${b.name}, ça ne peut pas prendre.`);
+          break;
+        }
+        a.opinions[b.id] = Math.max(a.opinions[b.id] ?? 0, 0.8);
+        b.opinions[a.id] = Math.max(b.opinions[a.id] ?? 0, 0.8);
+        this.emit('god.inject', [a.id, b.id], `💘 Coup de foudre entre ${a.name} et ${b.name} !`);
+        this.life.pair(this, a, b);
+        break;
+      }
+      case 'god.accuse':
+        if (!this.daily.justice.frame(this, c.agentId)) this.emit('god.inject', [], '⚖️ Une affaire est déjà en cours : le village attend son procès.');
         break;
       case 'god.agent.add':
         addAgent(this, c);
@@ -568,6 +635,7 @@ export class Sim {
     this.coveredNews.clear();
     this.issueSince = null;
     this.issuesToday = 0;
+    this.issueTopic = undefined;
     this.journal.restart();
     clearNews();
     buildNetwork(this, { silent: true });
@@ -593,7 +661,7 @@ export class Sim {
         politics: this.politics, life: this.life, economy: this.economy,
         daily: { ...stateOf(this.daily), todays: this.daily.todaysForSave() },
         pending: this.pending, nextMsgId: this.nextMsgId,
-        coveredNews: this.coveredNews, issueSince: this.issueSince, issuesToday: this.issuesToday,
+        coveredNews: this.coveredNews, issueSince: this.issueSince, issuesToday: this.issuesToday, issueTopic: this.issueTopic,
       }),
     };
   }
@@ -617,6 +685,7 @@ export class Sim {
     this.coveredNews = s.coveredNews as Set<number>;
     this.issueSince = s.issueSince as number | null;
     this.issuesToday = s.issuesToday as number;
+    this.issueTopic = s.issueTopic as SimEvent | undefined;
     this.outbox = [];
     return true;
   }

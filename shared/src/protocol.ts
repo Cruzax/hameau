@@ -1,6 +1,6 @@
 // Protocole WebSocket client ⇄ serveur.
 import type { FounderSpec } from './traits';
-import type { Agent, AgentId, EffectKind, HouseId, Message, RoadId, SimClock, SimEvent, Vec2, WorldState } from './types';
+import type { Agent, AgentId, EffectKind, HouseId, Message, RoadId, SimClock, SimEvent, Vec2, WorkplaceKind, WorldState } from './types';
 
 export const SERVER_PORT = 8787;
 
@@ -23,5 +23,12 @@ export type ClientToServer =
   | { type: 'god.vote.force' }
   | { type: 'god.opinion'; who: AgentId; about: AgentId; delta: number }
   | { type: 'god.effect'; kind: EffectKind }
+  | { type: 'god.treasure'; position: Vec2 }
+  | { type: 'god.money'; agentId: AgentId; delta: number }
+  | { type: 'god.harvest' }
+  | { type: 'god.crash' }
+  | { type: 'god.workplace.open'; kind: WorkplaceKind }
+  | { type: 'god.love'; a: AgentId; b: AgentId }
+  | { type: 'god.accuse'; agentId: AgentId }
   /** Recommence une histoire vierge. */
   | { type: 'god.reset'; preset?: 'complet' | 'origine'; founders?: FounderSpec[] };

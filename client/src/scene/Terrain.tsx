@@ -8,7 +8,8 @@ const HILL = new Color('#7f9c4c');
 const HILL_HIGH = new Color('#c9a66b');
 const SAND = new Color('#dcc48f');
 
-export function Terrain({ terrain }: { terrain: TerrainData }) {
+/** `onPick` : clic sur le sol (point visé), quand un pouvoir du mode Dieu attend une position. */
+export function Terrain({ terrain, onPick }: { terrain: TerrainData; onPick?: (p: { x: number; z: number }) => void }) {
   const geometry = useMemo(() => {
     const seg = 120;
     const plane = new PlaneGeometry(terrain.size, terrain.size, seg, seg);
@@ -43,7 +44,17 @@ export function Terrain({ terrain }: { terrain: TerrainData }) {
   }, [terrain]);
 
   return (
-    <mesh geometry={geometry} receiveShadow>
+    <mesh
+      geometry={geometry}
+      receiveShadow
+      onClick={onPick && ((e) => {
+        if (e.delta > 4) return; // un glisser de caméra, pas un clic
+        e.stopPropagation();
+        onPick({ x: e.point.x, z: e.point.z });
+      })}
+      onPointerOver={onPick && (() => (document.body.style.cursor = 'crosshair'))}
+      onPointerOut={onPick && (() => (document.body.style.cursor = ''))}
+    >
       <meshStandardMaterial vertexColors flatShading roughness={0.95} />
     </mesh>
   );

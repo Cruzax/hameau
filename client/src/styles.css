@@ -959,3 +959,37 @@ button.brain__opt { cursor: pointer; }
   .loading__house { animation: none; transform: none; }
   .loading__tip { animation: none; }
 }
+
+/* Mode Dieu : onglets, cartes de pouvoirs, outil armé. */
+.god__tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 8px 10px 4px; }
+.god .god__tabs button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.god .god__tabs button.is-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.god__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.god .god__card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 8px 10px; border-radius: 12px; white-space: normal; text-align: left;
+}
+.god__card strong { font-size: 12.5px; }
+.god__card span { color: var(--ink-soft); font-size: 11px; line-height: 1.3; }
+.god__section > .god__primary { width: 100%; margin-top: 6px; padding: 7px 10px; }
+.god__primary.is-armed { animation: god-armed 1s ease-in-out infinite alternate; }
+@keyframes god-armed { to { filter: brightness(1.18); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); } }
+.god__note { margin: 10px 12px; }
+.god__row input { flex: 1; min-width: 0; }
+
+/* Fiche maison : pouvoirs sur une personne. */
+.sheet__god { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--panel-line); }
+.sheet__god button, .sheet__god select {
+  font: inherit; font-size: 11px; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--panel-line); background: rgba(255, 255, 255, 0.7); cursor: pointer;
+}
+.sheet__god button:disabled { opacity: 0.45; cursor: default; }
+.sheet__ruin { margin: 6px 0; padding: 6px 10px; border-radius: 10px; background: rgba(107, 93, 79, 0.12); font-size: 12px; }
+
+/* Gazette : brèves, météo, mot du maire. */
+.gazette__extras { margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); font-size: 12px; }
+.gazette__section-title { font-weight: 700; font-size: 11.5px; margin: 6px 0 3px; color: var(--accent); }
+.gazette__briefs { margin: 0; padding-left: 0; list-style: none; }
+.gazette__briefs li { padding: 2px 0; line-height: 1.35; }
+.gazette__weather { margin: 4px 0; }
+.gazette__mayor { margin: 6px 0 0; font-style: italic; color: var(--ink-soft); }

@@ -104,7 +104,12 @@ export class Life {
     return !!(fa?.parentIds.includes(b.id) || fb?.parentIds.includes(a.id) || fa?.parentIds.some((p) => fb?.parentIds.includes(p)));
   }
 
-  private pair(sim: Sim, a: Agent, b: Agent) {
+  /** Un coup de foudre possible entre ces deux-là ? (libres, pas de la même famille, attirance réciproque) */
+  canFallInLove(a: Agent, b: Agent) {
+    return a.id !== b.id && !a.family?.partnerId && !b.family?.partnerId && !this.related(a, b) && attracted(a, b) && attracted(b, a);
+  }
+
+  pair(sim: Sim, a: Agent, b: Agent) {
     this.family(a).partnerId = b.id;
     this.family(b).partnerId = a.id;
     this.coupledSince.set(pairKey(a.id, b.id), sim.clock.day);
@@ -260,7 +265,7 @@ export class Life {
     const id = slug(sim, name);
     const r = this.rand();
     const role: Role = r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
-    const empty = Object.values(w.houses).find((h) => !h.ownerId && isDwelling(h));
+    const empty = Object.values(w.houses).find((h) => !h.ownerId && !h.ruined && isDwelling(h));
     const house = empty ?? newHouse(sim, id, homeSite(sim), role);
     if (!house) return;
     house.ownerId = id;

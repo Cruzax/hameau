@@ -94,7 +94,7 @@ export function GazettePanel() {
     <Panel id="gazette" icon="📰" title="La Gazette" minW={240}>
       {!gazettes.length && <p className="panel__empty">Pas encore de gazette. Le maire attend un sujet…</p>}
       {[...gazettes].reverse().map((g) => (
-        <article key={g.day} className="gazette">
+        <article key={`${g.day}-${g.publishedTick ?? 0}`} className="gazette">
           <div className="gazette__kicker">Jour {g.day}{g.approvedBy ? ` · validée par ${name(g.approvedBy)}` : ''}</div>
           <h4 className="gazette__title">{g.headline}</h4>
           {g.articles[0]?.body && <p className="gazette__body">{g.articles[0].body}</p>}
@@ -102,6 +102,30 @@ export function GazettePanel() {
             <p className="gazette__review">
               « {g.review.text} » — {name(g.review.by)}
             </p>
+          )}
+          {(g.briefs?.length || g.weather || g.mayorWord) && (
+            <div className="gazette__extras">
+              {!!g.briefs?.length && (
+                <>
+                  <div className="gazette__section-title">En bref</div>
+                  <ul className="gazette__briefs">
+                    {g.briefs.map((b, i) => <li key={i}>{b}</li>)}
+                  </ul>
+                </>
+              )}
+              {g.weather && (
+                <>
+                  <div className="gazette__section-title">Météo</div>
+                  <p className="gazette__weather">{g.weather}</p>
+                </>
+              )}
+              {g.mayorWord && (
+                <>
+                  <div className="gazette__section-title">Le mot du maire</div>
+                  <p className="gazette__mayor">« {g.mayorWord.replace(/ — [^—]+$/, '')} » — {g.mayorWord.split(' — ').at(-1)}</p>
+                </>
+              )}
+            </div>
           )}
         </article>
       ))}

@@ -10,6 +10,8 @@ interface UIState {
   selectedHouse: string | null;
   /** Écran de création d'une nouvelle histoire ouvert. */
   starting: boolean;
+  /** Pouvoir du mode Dieu qui attend un clic sur la carte (poser un trésor). */
+  godTool: 'treasure' | null;
   set: (patch: Partial<Omit<UIState, 'set'>>) => void;
 }
 
@@ -17,6 +19,7 @@ export const useUI = create<UIState>((set) => ({
   shot: 'libre',
   focusHouse: null,
   starting: false,
+  godTool: null,
   selectedHouse: null,
   set: (patch) => set(patch),
 }));

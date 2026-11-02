@@ -104,6 +104,8 @@ export interface Agent {
   needs?: Needs;
   inventory?: Inventory;
   location?: AgentLocation;
+  /** Logé chez quelqu'un d'autre (maison détruite) : c'est là qu'on rentre le soir. */
+  lodging?: HouseId;
   asleep?: boolean;
   /** Sexe et orientation (couples, enfants). Absents chez les anciens habitants. */
   sex?: 'M' | 'F';
@@ -128,6 +130,8 @@ export interface House {
   kind?: NodeKind;
   position: Vec2;
   rotation: number;      // rotation Y en radians (la porte regarde vers +z local)
+  /** Maison détruite (tornade) : ses habitants logent ailleurs jusqu'à la reconstruction. */
+  ruined?: { sinceDay: number; rebuildDay: number };
   style: HouseStyle;
   wallColor: string;
   roofColor: string;
@@ -230,6 +234,12 @@ export interface Gazette {
   day: number;
   headline: string;
   articles: Article[];
+  /** Les autres nouvelles depuis le numéro précédent, en quelques mots. */
+  briefs?: string[];
+  /** Le temps qu'il a fait depuis le dernier numéro. */
+  weather?: string;
+  /** Le mot du maire. */
+  mayorWord?: string;
   review?: { by: AgentId; score: number; text: string };
   approvedBy?: AgentId;  // le maire qui a validé
   publishedTick?: number;
@@ -290,7 +300,9 @@ export type SimEventType =
   // Économie
   | 'job.changed' | 'workplace.opened' | 'workplace.closed'
   | 'health.sick' | 'health.healed' | 'repair.done' | 'song' | 'party'
-  | 'village.event' | 'calendar' | 'life.hobby';
+  | 'village.event' | 'calendar' | 'life.hobby'
+  // Catastrophes et coups de pouce du ciel
+  | 'house.destroyed' | 'house.rebuilt' | 'treasure.placed' | 'treasure.found' | 'god.gift';
 
 /** Une ligne du journal. Append-only, horodatée, rejouable : c'est le « script » des vidéos. */
 export interface SimEvent {
@@ -327,7 +339,7 @@ export interface SimClock {
 
 /** orage : pluie, éclairs, messagers ralentis · crue : la rivière déborde et coupe les ponts ·
  *  puits : le puits de la place s'illumine (trésor, mystère). */
-export type EffectKind = 'storm' | 'flood' | 'well';
+export type EffectKind = 'storm' | 'flood' | 'well' | 'tornado';
 
 export interface WorldEffect {
   id: string;
@@ -336,6 +348,19 @@ export interface WorldEffect {
   endTick: number;
   /** Routes coupées par l'effet (crue), rouvertes à la fin. */
   cutRoads?: RoadId[];
+  /** Tornade : son trajet (elle passe sur la maison visée à mi-parcours) et la maison visée. */
+  path?: Vec2[];
+  houseId?: HouseId;
+  /** La tornade a déjà frappé. */
+  struck?: boolean;
+}
+
+/** Un coffre posé par le mode Dieu : le premier qui passe à côté le ramasse. */
+export interface Treasure {
+  id: string;
+  position: Vec2;
+  amount: number;
+  placedTick: number;
 }
 
 import type { LLMProviderName } from './estimate';
@@ -355,6 +380,8 @@ export interface WorldState {
   /** Tous les N jours, une fenêtre de vote s'ouvre. */
   voteEveryDays: number;
   effects: WorldEffect[];
+  /** Coffres qui attendent d'être trouvés. */
+  treasures?: Treasure[];
   rumors: Rumor[];
   gazetteDraft?: GazetteDraft;
   llm: {

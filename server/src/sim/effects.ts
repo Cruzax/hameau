@@ -1,8 +1,9 @@
-import { roadPath, segmentIntersection, type EffectKind, type WorldEffect } from '@hameau/shared';
+import { dayFraction, roadPath, segmentIntersection, type EffectKind, type WorldEffect } from '@hameau/shared';
+import { tornadoTrack, wreckHouse } from './disasters';
 import type { Sim } from './Sim';
 
 /** Durée de chaque phénomène, en fraction de journée. */
-const DURATION: Record<EffectKind, number> = { storm: 0.25, flood: 0.35, well: 0.12 };
+const DURATION: Record<EffectKind, number> = { storm: 0.25, flood: 0.35, well: 0.12, tornado: 0.06 };
 /** Pendant un orage, les messagers avancent moins vite. */
 export const STORM_SLOWDOWN = 0.55;
 
@@ -10,6 +11,7 @@ const ANNOUNCE: Record<EffectKind, [string, string]> = {
   storm: ['⛈ Un orage éclate sur le village ! Les messagers pataugent.', '🌤 L’orage s’éloigne.'],
   flood: ['🌊 La rivière déborde ! Les ponts sont submergés.', '🌉 La décrue : les ponts sont de nouveau praticables.'],
   well: ['✨ Le puits de la place se met à briller d’une lueur dorée…', '🪣 La lueur du puits s’éteint.'],
+  tornado: ['🌪 Une tornade fonce sur le village ! Tout le monde aux abris !', '🌤 La tornade s’est dissipée. On compte les dégâts.'],
 };
 
 /** Mots-clés d'un événement injecté qui déclenchent l'animation correspondante. */
@@ -48,6 +50,11 @@ export function startEffect(sim: Sim, kind: EffectKind) {
     startTick: sim.clock.tick,
     endTick: sim.clock.tick + Math.round(w.clock.ticksPerDay * DURATION[kind]),
   };
+  if (kind === 'tornado') {
+    const track = tornadoTrack(sim);
+    if (!track) return;
+    Object.assign(effect, track);
+  }
   if (kind === 'flood') {
     const cut = bridgeRoads(sim).filter((r) => r.status === 'open');
     for (const r of cut) r.status = 'cut';
@@ -63,6 +70,19 @@ export function startEffect(sim: Sim, kind: EffectKind) {
 
 export function tickEffects(sim: Sim) {
   const w = sim.world;
+  // La météo prévue ce matin arrive à son heure.
+  const plan = sim.daily.weatherPlan;
+  if (plan && sim.dayTick >= Math.round(sim.clock.ticksPerDay * dayFraction(plan.hour))) {
+    sim.daily.weatherPlan = null;
+    startEffect(sim, plan.kind);
+  }
+  // La tornade frappe la maison visée quand elle passe dessus, à mi-parcours.
+  for (const e of w.effects) {
+    if (e.kind !== 'tornado' || e.struck || !e.houseId || sim.clock.tick < (e.startTick + e.endTick) / 2) continue;
+    e.struck = true;
+    wreckHouse(sim, e.houseId);
+    sim.broadcastPatch({ effects: w.effects });
+  }
   const over = w.effects.filter((e) => sim.clock.tick >= e.endTick);
   if (!over.length) return;
   w.effects = w.effects.filter((e) => !over.includes(e));

@@ -1,4 +1,5 @@
-import { ROLE_COLOR, ROLE_LABEL, satisfaction, type Agent, type WorldState, type Workplace } from '@hameau/shared';
+import { useState } from 'react';
+import { attracted, ROLE_COLOR, ROLE_LABEL, satisfaction, type Agent, type WorldState, type Workplace } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { WORKPLACE_LABEL } from '../scene/House';
 import { Panel } from './Panel';
@@ -57,7 +58,30 @@ function Resident({ a, w }: { a: Agent; w: WorldState }) {
       <Gauge label="Énergie" value={n.energie} />
       <Gauge label="Humeur" value={n.humeur} />
       <Gauge label="Santé" value={n.sante} />
+      {a.lodging && <p className="sheet__ruin">🏚 Hébergement chez {w.houses[a.lodging]?.ownerId ? w.agents[w.houses[a.lodging].ownerId!]?.name : 'un voisin'} en attendant la reconstruction.</p>}
+      <GodActions a={a} w={w} />
     </section>
+  );
+}
+
+/** Pouvoirs du mode Dieu sur cette personne. */
+function GodActions({ a, w }: { a: Agent; w: WorldState }) {
+  const send = useHameau((s) => s.send);
+  const [lover, setLover] = useState('');
+  const matches = a.family?.partnerId ? [] : Object.values(w.agents).filter((b) => b.id !== a.id && !b.family?.partnerId && attracted(a, b) && attracted(b, a));
+  return (
+    <div className="sheet__god" aria-label="Pouvoirs">
+      <button title="Mode Dieu" onClick={() => send({ type: 'god.money', agentId: a.id, delta: 20 })}>🎁 +20 pièces</button>
+      <button title="Mode Dieu" disabled={!(a.inventory?.pieces ?? 0)} onClick={() => send({ type: 'god.money', agentId: a.id, delta: -20 })}>💸 −20</button>
+      <button title="Mode Dieu" onClick={() => send({ type: 'god.accuse', agentId: a.id })}>⚖️ Accuser</button>
+      {matches.length > 0 && (
+        <select value={lover} onChange={(e) => { if (e.target.value) send({ type: 'god.love', a: a.id, b: e.target.value }); setLover(''); }}>
+          <option value="">💘 Coup de foudre…</option>
+          {matches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      )}
+      <button title="Mode Dieu" disabled={Object.keys(w.agents).length <= 2} onClick={() => send({ type: 'god.agent.exile', agentId: a.id })}>🧳 Exiler</button>
+    </div>
   );
 }
 
@@ -97,6 +121,7 @@ export function HouseSheet() {
       {!house && <p className="sheet__empty">Clique sur une maison ou un lieu de travail pour voir qui y vit et comment ça va.</p>}
       {house && wp && <WorkplaceSheet wp={wp} w={w} />}
       {house && house.kind === 'travail' && !wp && <p className="sheet__empty">Ce bâtiment est vide depuis une faillite.</p>}
+      {house?.ruined && <p className="sheet__ruin">🌪 Emportée par la tornade le jour {house.ruined.sinceDay}. Reconstruction prévue le jour {house.ruined.rebuildDay}.</p>}
       {house && house.kind !== 'travail' && residents.length === 0 && <p className="sheet__empty">Personne n’habite ici pour l’instant.</p>}
       {residents.map((a) => <Resident key={a.id} a={a} w={w} />)}
     </Panel>

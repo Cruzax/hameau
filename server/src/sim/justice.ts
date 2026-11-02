@@ -13,6 +13,8 @@ interface Case {
   openedDay: number;
   status: 'enquete' | 'proces' | 'clos';
   accused?: AgentId;
+  /** Vol déjà annoncé (coup monté du mode Dieu) : pas de seconde annonce au matin. */
+  announced?: boolean;
 }
 
 const TRIAL_HOUR = 18;
@@ -70,9 +72,28 @@ export class Justice {
     this.cases.push(c);
   }
 
+  /**
+   * Coup monté (mode Dieu) : une bourse disparaît et tous les soupçons tombent sur `accusedId`, coupable ou non.
+   * Le procès a lieu le lendemain soir. Renvoie false si une affaire est déjà en cours.
+   */
+  frame(sim: Sim, accusedId: AgentId): boolean {
+    const accused = sim.agent(accusedId);
+    const others = Object.values(sim.world.agents).filter((a) => a.id !== accusedId);
+    if (this.open || !accused || !others.length) return false;
+    const victim = others[Math.floor(Math.random() * others.length)];
+    this.cases.push({
+      id: `c${this.cases.length + 1}`, victim: victim.id, loss: 'une bourse de pièces', culprit: '',
+      suspicion: { [accusedId]: 6 }, openedDay: sim.clock.day, status: 'enquete', announced: true,
+    });
+    const witness = others.find((a) => a.id !== victim.id);
+    if (witness) createRumor(sim, witness.id, 'rodeur', accusedId, false, victim.id);
+    sim.emit('crime.theft', [victim.id, accusedId], `🚨 Une bourse a disparu chez ${victim.name} ! Tous les regards se tournent vers ${accused.name}…`, { framed: true });
+    return true;
+  }
+
   /** Au réveil, la victime découvre le vol. */
   onMorning(sim: Sim) {
-    const c = this.cases.find((x) => x.status === 'enquete' && x.openedDay === sim.clock.day);
+    const c = this.cases.find((x) => x.status === 'enquete' && x.openedDay === sim.clock.day && !x.announced);
     if (!c) return;
     const victim = sim.agent(c.victim);
     if (!victim) return;

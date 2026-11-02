@@ -31,7 +31,7 @@ function rankAt(world: WorldState, a: Agent, same: (x: Agent) => boolean) {
 export function agentPose(world: WorldState, agentId: string, tick: number): Pose | null {
   const a = world.agents[agentId];
   if (!a) return null;
-  const home = world.houses[a.houseId];
+  const home = world.houses[a.lodging ?? a.houseId];
   const l = a.location ?? { kind: 'home' as const };
 
   if (l.kind === 'walking') {

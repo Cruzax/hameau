@@ -101,3 +101,21 @@ test('dans un tout petit hameau, un nouveau voisin suffit à faire la une', () =
   assert.equal(pickHeadline(events, new Set()), null);
   assert.equal(pickHeadline(events, new Set(), 3)?.seq, 1);
 });
+
+test('les brèves reprennent les autres nouvelles, la météo et le mot du maire suivent le journal', async () => {
+  const { briefsSince, weatherSince, mayorWord } = await import('../content/gazetteExtras');
+  const events = [
+    ev(1, 'agent.born', '👶 Naissance de Jules'),
+    ev(2, 'crime.theft', '🚨 Vol chez Lina'),
+    { ...ev(3, 'job.changed', 'x', { hired: true }) },
+    ev(4, 'world.effect', '🌪 Tornade', { phase: 'start', effect: { kind: 'tornado' } }),
+    ev(5, 'house.destroyed', '🌪 La tornade emporte la maison de Rose !'),
+  ];
+  const briefs = briefsSince(events, 5);
+  assert.ok(briefs.some((b) => /Jules/.test(b)) && briefs.some((b) => /Lina/.test(b)));
+  assert.ok(!briefs.some((b) => /Rose/.test(b)), 'la une ne revient pas en brève');
+  assert.ok(briefs.some((b) => /1 embauche/.test(b)));
+  assert.match(weatherSince(events), /tornade/i);
+  const sim = newSim();
+  assert.match(mayorWord(events, sim.world) ?? '', /rebâtira|sinistrés/);
+});

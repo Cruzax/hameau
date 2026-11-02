@@ -115,11 +115,14 @@ export function Roads({
   houses,
   terrain,
   onToggle,
+  onPick,
 }: {
   roads: Road[];
   houses: Record<string, House>;
   terrain: Terrain;
   onToggle?: (roadId: string) => void;
+  /** Pouvoir du mode Dieu en attente : le clic pose à cet endroit au lieu de couper la route. */
+  onPick?: (p: { x: number; z: number }) => void;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const built = useMemo(() => {
@@ -141,7 +144,8 @@ export function Roads({
             onClick={(e) => {
               e.stopPropagation();
               if (e.delta > 4) return; // c'était un glisser de caméra, pas un clic
-              onToggle?.(road.id);
+              if (onPick) onPick({ x: e.point.x, z: e.point.z });
+              else onToggle?.(road.id);
             }}
             onPointerOver={(e) => {
               e.stopPropagation();
