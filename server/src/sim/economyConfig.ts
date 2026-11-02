@@ -23,13 +23,13 @@ export const OUTPUT_PER_WORKER = { ble: 6, bois: 4, farine: 8, pain: 16, outils:
 export const BREAD_PER_FLOUR = 3;
 export const BREAD_PER_WOOD = 6;
 /** Prix de vente, en pièces. */
-export const PRICES = { ble: 1, farine: 2, bois: 2, outils: 6, pain: 1 } as const;
+export const PRICES = { ble: 0.5, farine: 1, bois: 1, outils: 6, pain: 1 } as const;
 /** Pain du potager, chaque matin, pour un adulte sans emploi. */
 export const SUBSISTENCE_BREAD = 1;
 /** Pain du potager familial pour un enfant. */
 export const CHILD_BREAD = 2;
 /** Pains qu'un habitant achète d'un coup. */
-export const BREAD_PER_PURCHASE = 4;
+export const BREAD_PER_PURCHASE = 3;
 /** La boulangerie garde quelques pains en réserve et n'en offre que quelques-uns par jour. */
 export const BAKERY_RESERVE = 2;
 export const GIFTS_PER_DAY = 4;
