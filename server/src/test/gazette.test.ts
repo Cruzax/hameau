@@ -84,5 +84,8 @@ test('un changement de maire et un vol le même jour : deux numéros', async () 
     sim.tick();
     if (i % 4 === 0) await new Promise((r) => setImmediate(r));
   }
-  assert.equal(published(sim).length, 2);
+  // Les deux numéros parlent des deux affaires du jour (d'autres peuvent suivre le lendemain).
+  const titles = published(sim).map((e) => e.text).join(' | ');
+  assert.match(titles, /devient maire/);
+  assert.match(titles, /Vol chez Marie/);
 });
