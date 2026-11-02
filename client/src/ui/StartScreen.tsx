@@ -86,10 +86,6 @@ export function StartScreen() {
                   </select>
                 </label>
               </div>
-              <label className="start__ai">
-                <input type="checkbox" checked={!!f.ai} disabled={!f.ai && founders.some((x) => x.ai)} onChange={(e) => update(i, { ai: e.target.checked })} />
-                Piloté par l’IA
-              </label>
             </section>
           ))}
         </div>

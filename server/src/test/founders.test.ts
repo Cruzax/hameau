@@ -37,7 +37,6 @@ test('des traits incompatibles sont refusés, avec un message en français', () 
   const err = validateFounders([{ name: 'X', traits: ['honnete', 'menteur'], role: 'auto' }]);
   assert.match(err ?? '', /honnête/i);
   assert.ok(validateFounders([{ name: 'X', traits: ['malin', 'bavard', 'reveur', 'tendre'], role: 'auto' }]));
-  assert.ok(validateFounders(FOUNDERS.map((f) => ({ ...f, ai: true }))), 'deux agents IA refusés');
 });
 
 test('le monde des fondateurs : 4 habitants, toute la chaîne du pain, des routes propres', () => {

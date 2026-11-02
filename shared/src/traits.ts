@@ -45,8 +45,6 @@ export interface FounderSpec {
   name: string;
   traits: TraitId[];
   role: Role | 'auto';
-  /** Piloté par l'IA (un seul au plus). */
-  ai?: boolean;
   sex?: Sex | 'auto';
   orientation?: Orientation | 'auto';
 }
@@ -82,7 +80,6 @@ export function validateFounders(specs: FounderSpec[]): string | null {
       if (clash) return `${s.name} ne peut pas être à la fois ${TRAITS[id].label} et ${TRAITS[clash].label}.`;
     }
   }
-  if (specs.filter((s) => s.ai).length > 1) return 'Un seul villageois peut être piloté par l’IA.';
   if (new Set(specs.map((s) => founderId(s.name))).size !== specs.length) return 'Deux villageois ne peuvent pas porter le même nom.';
   return null;
 }

@@ -338,8 +338,7 @@ export interface WorldEffect {
   cutRoads?: RoadId[];
 }
 
-import type { LLMProviderName } from './providers';
-export type { LLMProviderName };
+import type { LLMProviderName } from './estimate';
 
 export interface WorldState {
   clock: SimClock;
@@ -348,8 +347,6 @@ export interface WorldState {
   agents: Record<AgentId, Agent>;
   houses: Record<HouseId, House>;
   roads: Record<RoadId, Road>;
-  /** Le seul villageois piloté par l'IA, s'il y en a un. */
-  aiAgentId?: AgentId;
   /** Lieux de travail (fermes, moulins, scieries…), rattachés à un nœud de `houses`. */
   workplaces: Record<string, Workplace>;
   messages: Record<MessageId, Message>;
@@ -362,14 +359,6 @@ export interface WorldState {
   gazetteDraft?: GazetteDraft;
   llm: {
     provider: LLMProviderName;
-    /** Modèle utilisé (Claude ou Ollama). */
-    model?: string;
-    /** Fournisseurs utilisables tout de suite (clé API présente, Ollama joignable). */
-    available?: Partial<Record<LLMProviderName, boolean>>;
-    /** Fin de chaque clé enregistrée (ex. « …a1b2 »), pour l'afficher sans la révéler. */
-    keyHints?: Partial<Record<LLMProviderName, string>>;
-    /** Modèles proposés par chaque fournisseur (récupérés à la vérification de la clé). */
-    models?: Partial<Record<LLMProviderName, string[]>>;
     budget: LLMBudget;
   };
 }

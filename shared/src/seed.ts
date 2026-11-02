@@ -252,7 +252,6 @@ export function createFounderWorld(founders: FounderSpec[], rand: () => number =
     'wp-moulin': { id: 'wp-moulin', kind: 'moulin', era: 'ancienne', houseId: mill.id, ownerId: null, slots: 2, workers: [], till: 40, stock: { farine: 8 }, unpaidDays: 0, openedDay: 1 },
     'wp-scierie': { id: 'wp-scierie', kind: 'scierie', era: 'ancienne', houseId: sawmill.id, ownerId: null, slots: 3, workers: [], till: 40, stock: { bois: 8 }, unpaidDays: 0, openedDay: 1 },
   };
-  const ai = founders.findIndex((f) => f.ai);
   return {
     ...createSeedWorld('origine'),
     mayorId: ids[roles.indexOf('MAIRE')] ?? ids[0],
@@ -260,6 +259,5 @@ export function createFounderWorld(founders: FounderSpec[], rand: () => number =
     houses: byId([...houses, bakery, farm, mill, sawmill, ...structuredClone(NETWORK_NODES)]),
     roads: byId(structuredClone(NETWORK_ROADS)),
     workplaces,
-    ...(ai >= 0 ? { aiAgentId: ids[ai] } : {}),
   };
 }

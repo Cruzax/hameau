@@ -9,7 +9,7 @@ import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const newSim = () => new Sim(createLLMBrain(createProvider('mock')), new Journal(join(mkdtempSync(join(tmpdir(), 'hameau-')), 'j.jsonl')), () => {});
+const newSim = () => new Sim(createLLMBrain(createProvider()), new Journal(join(mkdtempSync(join(tmpdir(), 'hameau-')), 'j.jsonl')), () => {});
 
 test('un carrefour n’est pas une maison habitable', () => {
   const j: House = { id: 'j-test', kind: 'carrefour', ownerId: null, position: { x: 15, z: 15 }, rotation: 0, style: 'carrefour', wallColor: '#000', roofColor: '#000' };

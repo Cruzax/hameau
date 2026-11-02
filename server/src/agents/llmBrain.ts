@@ -2,8 +2,8 @@ import type { Agent, AgentId } from '@hameau/shared';
 import type { Brain, Sim } from '../sim/Sim';
 import { neighbors } from '../sim/network';
 import type { LLMProvider, LLMRequest } from '../llm/LLMProvider';
-import { DecisionSchema, SummarySchema, VoteSchema, toActions, voteActions } from './decision';
-import { situationPrompt, summaryPrompt, systemPrompt, votePrompt, type Trigger } from './prompts';
+import { DecisionSchema, toActions, voteActions } from './decision';
+import { situationPrompt, systemPrompt, type Trigger } from './prompts';
 import { CHATTER, createScript } from './scripted';
 import { LLM_CONFIG } from '../llm/config';
 
@@ -45,11 +45,6 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
     return false;
   }
 
-  /** Seul le villageois choisi à la création pense avec l'IA ; les autres suivent le script (gratuit). */
-  function usesAI(sim: Sim, agentId: AgentId) {
-    return provider.name !== 'mock' && sim.world.aiAgentId === agentId;
-  }
-
   async function call<T>(sim: Sim, agent: Agent, purpose: string, req: LLMRequest<T>): Promise<T | null> {
     const res = await provider.complete(req);
     const b = sim.world.llm.budget;
@@ -74,15 +69,14 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
     sim.setActivity(agentId, 'thinking');
     try {
       const scripted = () => script.decide(sim.world, agent, trigger);
-      // Budget épuisé : l'agent IA retombe sur le script plutôt que de se taire.
-      const decision = usesAI(sim, agentId) && reserve(sim)
-        ? await call(sim, agent, 'décision', {
-          system: systemPrompt(agent, agent.id === sim.world.mayorId),
-          prompt: situationPrompt(sim.world, agent, trigger),
-          schema: DecisionSchema,
-          scripted,
-        })
-        : (provider.name === 'mock' && reserve(sim), scripted()); // en gratuit, on compte quand même pour l'affichage
+      // Décision scriptée (gratuite) ; on en estime quand même les tokens, pour savoir ce que coûterait une IA.
+      reserve(sim);
+      const decision = await call(sim, agent, 'décision', {
+        system: systemPrompt(agent, agent.id === sim.world.mayorId),
+        prompt: situationPrompt(sim.world, agent, trigger),
+        schema: DecisionSchema,
+        scripted,
+      });
       const actions = decision ? toActions(sim.world, agent, decision) : [{ type: 'think' as const, text: '…' }];
       if (actions.length) sim.plan(agentId, ACT_DELAY, actions);
       else sim.setActivity(agentId, 'idle');
@@ -124,22 +118,10 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
     },
 
     onVoteOpened(sim, vote) {
-      // Chaque habitant remplit son bulletin. Sans budget, le bulletin scripté (gratuit) prend le relais :
-      // un vote ne doit jamais être bloqué par le compteur.
+      // Chaque habitant remplit son bulletin scripté, avec un petit délai pour que les messagers ne partent pas tous ensemble.
       for (const agent of Object.values(sim.world.agents)) {
-        const scripted = () => script.vote(sim.world, agent, vote);
         const delay = 3 + Math.floor(script.rand() * 30);
-        if (!usesAI(sim, agent.id) || !reserve(sim)) {
-          sim.plan(agent.id, delay, voteActions(sim.world, agent, scripted()));
-          continue;
-        }
-        sim.setActivity(agent.id, 'voting');
-        void call(sim, agent, 'vote', {
-          system: systemPrompt(agent, agent.id === sim.world.mayorId),
-          prompt: votePrompt(sim.world, agent, vote),
-          schema: VoteSchema,
-          scripted,
-        }).then((v) => sim.plan(agent.id, 2, voteActions(sim.world, agent, v ?? scripted())));
+        sim.plan(agent.id, delay, voteActions(sim.world, agent, script.vote(sim.world, agent, vote)));
       }
     },
 
@@ -147,21 +129,9 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
       if (provider.name === 'mock') {
         for (const s of script.moodSwings(sim.world)) sim.adjustOpinion(s.who, s.about, s.delta);
       }
-      // Mémoire longue : résumé par le modèle s'il reste du budget, sinon registre scripté (gratuit).
+      // Mémoire longue : un simple registre scripté des interlocuteurs du jour.
       for (const agent of Object.values(sim.world.agents)) {
-        if (!agent.memory.short.some((m) => m.day === sim.clock.day)) continue;
-        const fallback = script.summarize(sim.world, agent);
-        // Un jour sur deux seulement : le résumé par l'IA coûtait un quart des appels.
-        if (!usesAI(sim, agent.id) || sim.clock.day % 2 === 1 || !reserve(sim)) {
-          agent.memory.long = fallback;
-          continue;
-        }
-        void call(sim, agent, 'mémoire', {
-          system: systemPrompt(agent, agent.id === sim.world.mayorId),
-          prompt: summaryPrompt(sim.world, agent),
-          schema: SummarySchema,
-          scripted: () => ({ summary: fallback }),
-        }).then((s) => (agent.memory.long = s?.summary.slice(0, 600) ?? fallback));
+        if (agent.memory.short.some((m) => m.day === sim.clock.day)) agent.memory.long = script.summarize(sim.world, agent);
       }
     },
 

@@ -500,9 +500,6 @@ export class Sim {
         this.brain.onInject?.(this, text);
         break;
       }
-      case 'llm.config':
-        // Géré par index.ts (qui possède le fournisseur) ; voir onLLMConfig.
-        this.onLLMConfig?.(c);
         break;
       case 'god.agent.add':
         addAgent(this, c);
@@ -530,7 +527,6 @@ export class Sim {
   }
 
   /** Branché par index.ts pour changer de fournisseur LLM en direct. */
-  onLLMConfig?: (c: Extract<ClientToServer, { type: 'llm.config' }>) => void;
 
   /**
    * Histoire vierge : village de départ (complet ou d'origine), jour 1 à 6 h, journal neuf.
@@ -568,9 +564,7 @@ export class Sim {
       : preset === 'complet' ? '🔄 Nouvelle histoire : le village au complet.'
       : `🔄 Nouvelle histoire : ${founders.slice(0, -1).join(', ')} et ${founders.at(-1)} fondent le village.`, { reset: preset });
     // Le journal repart de zéro : on y note quel cerveau anime les agents.
-    this.emit('llm.config', [], `🧠 Cerveau des agents : ${llm.provider === 'mock' ? 'gratuit (réponses scriptées)' : `${llm.provider} · ${llm.model ?? '?'}`}.`, {
-      provider: llm.provider, model: llm.model, ok: true,
-    });
+    this.emit('llm.config', [], '🧠 Cerveau des agents : gratuit (règles scriptées).', { provider: llm.provider, ok: true });
     this.startDay();
     this.flush();
   }

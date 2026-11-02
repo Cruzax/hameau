@@ -2,7 +2,7 @@ export * from './types';
 export * from './protocol';
 export * from './seed';
 export * from './geometry';
-export * from './providers';
+export * from './estimate';
 export * from './time';
 export * from './french';
 export * from './terrain';

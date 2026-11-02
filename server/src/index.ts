@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { SERVER_PORT, type ClientToServer, type ServerToClient } from '@hameau/shared';
 import { LLM_CONFIG } from './llm/config';
-import { LLMControl } from './llm/control';
 import { createProvider } from './llm';
 import { Sim } from './sim/Sim';
 import { Journal } from './store/journal';
@@ -24,11 +23,8 @@ const sim = new Sim(brain, journal, broadcast);
 sim.world.voteEveryDays = Math.max(1, Number(process.env.VOTE_EVERY_DAYS ?? sim.world.voteEveryDays));
 sim.world.llm = {
   provider: provider.name,
-  model: provider.name === 'anthropic' ? LLM_CONFIG.anthropicModel : provider.name === 'ollama' ? LLM_CONFIG.ollamaModel : undefined,
   budget: { maxCallsPerDay: LLM_CONFIG.maxCallsPerDay, callsToday: 0, maxTokens: LLM_CONFIG.maxTokens, tokensIn: 0, tokensOut: 0 },
 };
-const llmControl = new LLMControl(sim, (p) => brain.setProvider(p));
-sim.onLLMConfig = (c) => void llmControl.configure(c);
 
 // HTTP : export du journal (script des vidéos).
 const http = createServer((req, res) => {
@@ -44,20 +40,13 @@ const http = createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server: http });
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws) => {
   clients.add(ws);
   const hello: ServerToClient = { type: 'snapshot', world: sim.world, events: journal.events.slice(-200) };
   ws.send(JSON.stringify(hello));
-  // La clé ne peut être envoyée que depuis ce PC, jamais depuis un autre appareil du réseau.
-  const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
   ws.on('message', (raw) => {
     try {
-      const cmd = JSON.parse(String(raw)) as ClientToServer;
-      if (cmd.type === 'llm.key') {
-        if (local) void llmControl.setKey(cmd);
-        return;
-      }
-      sim.command(cmd);
+      sim.command(JSON.parse(String(raw)) as ClientToServer);
     } catch (e) {
       console.warn('Commande invalide', e);
     }
@@ -66,12 +55,7 @@ wss.on('connection', (ws, req) => {
 });
 
 http.listen(SERVER_PORT, () => {
-  const model = provider.name === 'anthropic' ? ` (${LLM_CONFIG.anthropicModel})` : provider.name === 'ollama' ? ` (${LLM_CONFIG.ollamaModel})` : '';
   console.log(`🏡 Hameau — simulation sur http://localhost:${SERVER_PORT}`);
-  console.log(`🧠 LLM : ${provider.name}${model} · max ${LLM_CONFIG.maxCallsPerDay} appels/jour · max_tokens ${LLM_CONFIG.maxTokens}`);
-  if (provider.name === 'anthropic' && !process.env.ANTHROPIC_API_KEY) {
-    console.warn('⚠️  ANTHROPIC_API_KEY absente de .env : les appels échoueront si aucun profil `ant auth login` n’est actif.');
-  }
-  void llmControl.warmUp();
+  console.log('🧠 Cerveau des agents : gratuit (règles scriptées, tokens estimés)');
   sim.start();
 });

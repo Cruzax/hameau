@@ -18,7 +18,7 @@ export interface RunOptions {
 
 export async function runVillage(opts: RunOptions): Promise<{ sim: Sim; events: SimEvent[] }> {
   const journal = new Journal(join(mkdtempSync(join(tmpdir(), 'hameau-')), 'journal.jsonl'));
-  const sim = new Sim(createLLMBrain(createProvider('mock')), journal, () => {});
+  const sim = new Sim(createLLMBrain(createProvider()), journal, () => {});
   // Même budget d'appels que le serveur réel (index.ts).
   sim.world.llm.budget.maxCallsPerDay = LLM_CONFIG.maxCallsPerDay;
   // Une nouvelle histoire commence déjà par son premier matin.

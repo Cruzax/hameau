@@ -8,5 +8,5 @@ import { Journal } from '../store/journal';
 
 /** Simulation de test en mode gratuit, journal dans un dossier temporaire. */
 export function newSim() {
-  return new Sim(createLLMBrain(createProvider('mock')), new Journal(join(mkdtempSync(join(tmpdir(), 'hameau-')), 'j.jsonl')), () => {});
+  return new Sim(createLLMBrain(createProvider()), new Journal(join(mkdtempSync(join(tmpdir(), 'hameau-')), 'j.jsonl')), () => {});
 }

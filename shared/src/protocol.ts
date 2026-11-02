@@ -1,6 +1,6 @@
 // Protocole WebSocket client ⇄ serveur.
 import type { FounderSpec } from './traits';
-import type { Agent, AgentId, EffectKind, HouseId, LLMProviderName, Message, RoadId, SimClock, SimEvent, Vec2, WorldState } from './types';
+import type { Agent, AgentId, EffectKind, HouseId, Message, RoadId, SimClock, SimEvent, Vec2, WorldState } from './types';
 
 export const SERVER_PORT = 8787;
 
@@ -24,8 +24,4 @@ export type ClientToServer =
   | { type: 'god.opinion'; who: AgentId; about: AgentId; delta: number }
   | { type: 'god.effect'; kind: EffectKind }
   /** Recommence une histoire vierge. */
-  | { type: 'god.reset'; preset?: 'complet' | 'origine'; founders?: FounderSpec[] }
-  /** Choix du cerveau des agents, en direct. */
-  | { type: 'llm.config'; provider: LLMProviderName; model?: string }
-  /** Enregistre (ou efface, avec null) la clé API Anthropic dans le .env local. Jamais renvoyée au client. */
-  | { type: 'llm.key'; key: string | null; provider?: LLMProviderName };
+  | { type: 'god.reset'; preset?: 'complet' | 'origine'; founders?: FounderSpec[] };

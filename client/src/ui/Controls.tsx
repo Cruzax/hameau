@@ -1,6 +1,6 @@
 import { formatHour, isNight, villageHour } from '@hameau/shared';
 import { useHameau } from '../net/store';
-import { BrainMenu } from './BrainMenu';
+import { Estimate } from './Estimate';
 
 const SPEEDS = [1, 2, 4, 8];
 
@@ -24,7 +24,7 @@ export function Controls() {
           ×{s}
         </button>
       ))}
-      <BrainMenu />
+      <Estimate />
     </div>
   );
 }
