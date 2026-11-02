@@ -202,6 +202,7 @@ export function createSeedWorld(preset: VillagePreset = 'complet'): WorldState {
   return {
     clock: { tick: 0, day: 1, ticksPerDay: 480, tickMs: 625, speed: 1, paused: false },
     terrain: TERRAIN,
+    workplaces: {},
     mayorId: 'maire',
     agents: byId(agents),
     houses: byId(structuredClone(houses)),
@@ -214,4 +215,9 @@ export function createSeedWorld(preset: VillagePreset = 'complet'): WorldState {
     voteEveryDays: 3,
     llm: { provider: 'mock', budget: { maxCallsPerDay: 40, callsToday: 0, maxTokens: 300, tokensIn: 0, tokensOut: 0 } },
   };
+}
+
+/** Une maison où l'on peut habiter (ni lieu de travail, ni carrefour). */
+export function isDwelling(h: House): boolean {
+  return (h.kind ?? 'maison') === 'maison';
 }

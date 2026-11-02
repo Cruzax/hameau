@@ -1,4 +1,4 @@
-import { de, mulberry32, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
+import { de, isDwelling, mulberry32, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { neighbors } from './graph';
 import { buildRoad, houseName, newHouse, slug } from './god';
@@ -273,7 +273,7 @@ export class Life {
     const bakers = Object.values(w.agents).filter((x) => x.role === 'BOULANGER').length;
     const needBaker = Object.keys(w.agents).length >= 10 * Math.max(1, bakers);
     const role: Role = needBaker ? 'BOULANGER' : r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
-    const empty = Object.values(w.houses).find((h) => !h.ownerId);
+    const empty = Object.values(w.houses).find((h) => !h.ownerId && isDwelling(h));
     const near = this.pick(Object.values(w.houses));
     const house = empty ?? (near && newHouse(sim, id, near, role));
     if (!house) return;

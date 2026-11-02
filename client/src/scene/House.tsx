@@ -16,6 +16,10 @@ const DIMS: Record<HouseStyle, Dims> = {
   forge: { w: 3.8, d: 3.2, h: 2.0, roof: 1.3 },
   auberge: { w: 5.0, d: 3.6, h: 3.0, roof: 2.0 },
   echoppe: { w: 3.0, d: 2.6, h: 2.0, roof: 1.7 },
+  ferme: { w: 5.2, d: 3.4, h: 2.4, roof: 1.8 },
+  moulin: { w: 3.0, d: 3.0, h: 3.6, roof: 1.8 },
+  scierie: { w: 5.0, d: 3.4, h: 2.2, roof: 1.2 },
+  carrefour: { w: 0, d: 0, h: 0, roof: 0 },
 };
 
 /** Où sort la cheminée (en fraction de la largeur), et la couleur de sa fumée. */

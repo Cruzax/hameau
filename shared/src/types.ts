@@ -64,6 +64,10 @@ export interface Personality {
   tone: string;          // façon de parler, injectée dans le prompt système
   honesty: number;       // 0..1 — un MENTEUR est proche de 0
   ambition: number;      // 0..1 — propension à se présenter / proposer une destitution
+  /** Tendances issues des traits (0..1). Absentes = 0,5. */
+  generosity?: number;
+  diligence?: number;
+  curiosity?: number;
 }
 
 export interface MemoryEntry {
@@ -101,15 +105,24 @@ export interface Agent {
   inventory?: Inventory;
   location?: AgentLocation;
   asleep?: boolean;
+  /** Emploi actuel, s'il en a un. */
+  job?: { workplaceId: string; since: number; wage: number };
 }
 
 // ─── Village (graphe) ────────────────────────────────────────────────────────
 
-export type HouseStyle = 'mairie' | 'tour' | 'chaumiere' | 'atelier' | 'cabane' | 'boulangerie' | 'forge' | 'auberge' | 'echoppe';
+export type HouseStyle =
+  | 'mairie' | 'tour' | 'chaumiere' | 'atelier' | 'cabane' | 'boulangerie' | 'forge' | 'auberge' | 'echoppe'
+  | 'ferme' | 'moulin' | 'scierie' | 'carrefour';
+
+/** Nature d'un nœud du réseau : on habite une maison, on travaille dans un lieu, on passe par un carrefour. */
+export type NodeKind = 'maison' | 'travail' | 'carrefour';
 
 export interface House {
   id: HouseId;
   ownerId: AgentId | null;
+  /** Absent = maison. */
+  kind?: NodeKind;
   position: Vec2;
   rotation: number;      // rotation Y en radians (la porte regarde vers +z local)
   style: HouseStyle;
@@ -117,6 +130,29 @@ export interface House {
   roofColor: string;
   /** Chemin futur vers un modèle .glb (Kenney / Quaternius). Primitives si absent. */
   model?: string;
+}
+
+// ─── Travail ─────────────────────────────────────────────────────────────────
+
+export type Era = 'ancienne';
+export type WorkplaceKind = 'ferme' | 'moulin' | 'scierie' | 'forge' | 'boulangerie' | 'auberge' | 'herboristerie';
+export type Good = 'ble' | 'farine' | 'pain' | 'bois' | 'outils';
+
+export interface Workplace {
+  id: string;
+  kind: WorkplaceKind;
+  era: Era;
+  /** Nœud du réseau (entrée de `houses`, kind 'travail'). */
+  houseId: HouseId;
+  /** Patron qui empoche le surplus ; null = tenu par le village. */
+  ownerId: AgentId | null;
+  slots: number;
+  workers: AgentId[];
+  /** Caisse du lieu, en pièces. */
+  till: number;
+  stock: Partial<Record<Good, number>>;
+  unpaidDays: number;
+  openedDay: number;
 }
 
 export type RoadStatus = 'open' | 'cut';
@@ -243,6 +279,8 @@ export type SimEventType =
   | 'life.trip' | 'life.meet' | 'life.trade' | 'life.work' | 'life.need' | 'life.sleep'
   | 'rumor.spread' | 'rumor.announce'
   | 'crime.theft' | 'crime.investigate' | 'trial.opened' | 'trial.verdict'
+  // Économie
+  | 'job.changed' | 'workplace.opened' | 'workplace.closed'
   | 'health.sick' | 'health.healed' | 'repair.done' | 'song' | 'party'
   | 'village.event' | 'calendar' | 'life.hobby';
 
@@ -302,6 +340,8 @@ export interface WorldState {
   agents: Record<AgentId, Agent>;
   houses: Record<HouseId, House>;
   roads: Record<RoadId, Road>;
+  /** Lieux de travail (fermes, moulins, scieries…), rattachés à un nœud de `houses`. */
+  workplaces: Record<string, Workplace>;
   messages: Record<MessageId, Message>;
   gazettes: Gazette[];
   votes: VoteSession[];
