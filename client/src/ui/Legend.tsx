@@ -1,15 +1,9 @@
-import { ROLE_COLOR, ROLE_LABEL, type Agent, type WorldState } from '@hameau/shared';
+import { useState } from 'react';
+import { feeling, ROLE_COLOR, ROLE_LABEL, type Agent, type WorldState } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { Panel } from './Panel';
 import { useUI } from './uiStore';
 import { openHouseSheet } from '../scene/House';
-
-/** -1 (rouge) → 0 (crème) → +1 (vert). */
-function opinionColor(x: number) {
-  const t = Math.max(-1, Math.min(1, x));
-  const [r, g, b] = t < 0 ? [200 + 30 * (1 + t), 85 + 150 * (1 + t), 61 + 160 * (1 + t)] : [230 - 140 * t, 235 - 81 * t, 221 - 147 * t];
-  return `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
-}
 
 /** Ce que fait l'habitant en ce moment, en quelques mots. */
 function doing(w: WorldState, a: Agent): string {
@@ -88,46 +82,52 @@ export function Habitants() {
   );
 }
 
-/** Ce que chacun pense des autres, de -1 à +1. */
+/** Une ligne : un visage, un mot, et une barre qui part vers la droite (estime) ou la gauche (rancœur). */
+function FeelingRow({ name, color, x }: { name: string; color: string; x: number }) {
+  const f = feeling(x);
+  const width = Math.round(Math.min(1, Math.abs(x)) * 50);
+  return (
+    <li className={`feel feel--${f.tone}`} title={`${f.word} (${x > 0 ? '+' : ''}${x.toFixed(2)})`}>
+      <span className="feel__name" style={{ color }}>{name}</span>
+      <span className="feel__word">{f.face} {f.word}</span>
+      <span className="feel__bar">
+        <span style={x >= 0 ? { left: '50%', width: `${width}%` } : { right: '50%', width: `${width}%` }} />
+      </span>
+    </li>
+  );
+}
+
+/** Ce qu'un habitant pense des autres, et ce que les autres pensent de lui, en mots plutôt qu'en chiffres. */
 export function Relations() {
   const agents = useHameau((s) => s.world.agents);
   const list = Object.values(agents);
+  const [picked, setPicked] = useState<string | null>(null);
+  const me = (picked && agents[picked]) || list[0];
+  const others = me ? list.filter((b) => b.id !== me.id) : [];
+  const sortBy = (score: (b: Agent) => number) => [...others].sort((x, y) => score(y) - score(x));
 
   return (
-    <Panel id="relations" icon="💞" title="Ce qu’ils pensent les uns des autres" minW={220}>
-      <div className="opinions__wrap">
-        <table className="opinions">
-          <thead>
-            <tr>
-              <th />
-              {list.map((b) => (
-                <th key={b.id} title={b.name} style={{ color: ROLE_COLOR[b.role] }}>
-                  {b.name.slice(0, 3)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((a) => (
-              <tr key={a.id}>
-                <th style={{ color: ROLE_COLOR[a.role] }}>{a.name}</th>
-                {list.map((b) => {
-                  const x = a.opinions[b.id];
-                  return a.id === b.id || x === undefined ? (
-                    <td key={b.id} className="opinions__self" />
-                  ) : (
-                    <td key={b.id} style={{ background: opinionColor(x) }} title={`${a.name} → ${b.name} : ${x.toFixed(2)}`}>
-                      {x > 0 ? '+' : ''}
-                      {x.toFixed(1)}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <Panel id="relations" icon="💞" title="Relations" minW={240}>
+      <div className="feel__people">
+        {list.map((a) => (
+          <button key={a.id} className={`feel__pick ${me?.id === a.id ? 'is-on' : ''}`} onClick={() => setPicked(a.id)}>
+            <span className="person__dot" style={{ background: ROLE_COLOR[a.role] }} />
+            {a.name}
+          </button>
+        ))}
       </div>
-      <p className="panel__foot">Ligne = ce que cette personne pense de chaque colonne.</p>
+      {me && (
+        <>
+          <h4 className="feel__title">Ce que {me.name} pense des autres</h4>
+          <ul className="feel__list">
+            {sortBy((b) => me.opinions[b.id] ?? 0).map((b) => <FeelingRow key={b.id} name={b.name} color={ROLE_COLOR[b.role]} x={me.opinions[b.id] ?? 0} />)}
+          </ul>
+          <h4 className="feel__title">Ce que les autres pensent de {me.name}</h4>
+          <ul className="feel__list">
+            {sortBy((b) => b.opinions[me.id] ?? 0).map((b) => <FeelingRow key={b.id} name={b.name} color={ROLE_COLOR[b.role]} x={b.opinions[me.id] ?? 0} />)}
+          </ul>
+        </>
+      )}
     </Panel>
   );
 }

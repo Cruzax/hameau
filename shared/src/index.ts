@@ -8,3 +8,4 @@ export * from './french';
 export * from './terrain';
 export * from './traits';
 export * from './satisfaction';
+export * from './feelings';

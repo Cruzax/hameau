@@ -872,3 +872,29 @@ button.brain__opt { cursor: pointer; }
 .opinions { border-spacing: 3px; }
 .opinions td { border-radius: 6px; }
 .opinions th { font-weight: 700; }
+
+/* ─── Relations : en mots, pas en chiffres ──────────────────── */
+.feel__people { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.feel__pick {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border: 1px solid var(--panel-line); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7); font: inherit; font-size: 12px; color: var(--ink); cursor: pointer;
+}
+.feel__pick.is-on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.feel__title { margin: 10px 0 4px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.feel__list { list-style: none; margin: 0; padding: 0; }
+.feel { display: grid; grid-template-columns: minmax(60px, 1fr) minmax(92px, auto) 70px; align-items: center; gap: 8px; padding: 4px 2px; font-size: 12.5px; }
+.feel + .feel { border-top: 1px solid var(--panel-line); }
+.feel__name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feel__word { white-space: nowrap; }
+.feel__bar { position: relative; height: 6px; border-radius: 3px; background: rgba(70, 50, 30, 0.1); }
+.feel__bar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(70, 50, 30, 0.3); }
+.feel__bar > span { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.feel--tres-bon .feel__bar > span { background: #3f8a4f; }
+.feel--bon .feel__bar > span { background: #7fb27a; }
+.feel--neutre .feel__bar > span { background: #b8a888; }
+.feel--mauvais .feel__bar > span { background: #d88a5a; }
+.feel--tres-mauvais .feel__bar > span { background: #c0473a; }
+.feel--tres-bon .feel__word { color: #2f6f3f; font-weight: 600; }
+.feel--tres-mauvais .feel__word { color: #a2392e; font-weight: 600; }
+.feel--neutre .feel__word { color: var(--ink-soft); }
