@@ -27,6 +27,9 @@ const BROKE_PIECES = 3;
 /** …ou, dans un village presque plein où le travail manque, trop peu pour voir venir. */
 const CROWDED = 0.8;
 const CROWDED_BROKE_PIECES = 12;
+/** Le ventre vide (satiété sous ce seuil) ce nombre de soirs d'affilée : on part aussi. */
+const HUNGRY_BELOW = 0.2;
+const HUNGRY_LEAVE_DAYS = 2;
 
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
 
@@ -58,6 +61,8 @@ export class Life {
   private isolatedDays = new Map<AgentId, number>();
   /** Soirs d'affilée sans travail ni argent, par habitant. */
   private brokeDays = new Map<AgentId, number>();
+  /** Soirs d'affilée le ventre vide, par habitant. */
+  private hungryDays = new Map<AgentId, number>();
   /** Tous les prénoms déjà portés au village, même par ceux qui sont partis : jamais deux fois le même. */
   private usedNames = new Set<string>();
 
@@ -289,12 +294,18 @@ export class Life {
     const crowded = Object.keys(w.agents).length >= MAX_POPULATION * CROWDED;
     const limit = crowded ? CROWDED_BROKE_PIECES : BROKE_PIECES;
     const broke = (a: Agent) => isAdult(w, a) && !a.job && (a.inventory?.pieces ?? 0) < limit;
-    for (const a of Object.values(w.agents)) this.brokeDays.set(a.id, broke(a) ? (this.brokeDays.get(a.id) ?? 0) + 1 : 0);
-    for (const id of [...this.brokeDays.keys()]) if (!w.agents[id]) this.brokeDays.delete(id);
+    const hungry = (a: Agent) => isAdult(w, a) && (a.needs?.satiete ?? 1) < HUNGRY_BELOW;
     for (const a of Object.values(w.agents)) {
-      if ((this.brokeDays.get(a.id) ?? 0) < BROKE_LEAVE_DAYS || a.id === w.mayorId || this.rand() > BROKE_LEAVE_CHANCE) continue;
+      this.brokeDays.set(a.id, broke(a) ? (this.brokeDays.get(a.id) ?? 0) + 1 : 0);
+      this.hungryDays.set(a.id, hungry(a) ? (this.hungryDays.get(a.id) ?? 0) + 1 : 0);
+    }
+    for (const m of [this.brokeDays, this.hungryDays]) for (const id of [...m.keys()]) if (!w.agents[id]) m.delete(id);
+    const starving = (a: Agent) => (this.hungryDays.get(a.id) ?? 0) >= HUNGRY_LEAVE_DAYS;
+    const struggling = (a: Agent) => (this.brokeDays.get(a.id) ?? 0) >= BROKE_LEAVE_DAYS || starving(a);
+    for (const a of Object.values(w.agents)) {
+      if (!struggling(a) || a.id === w.mayorId || this.rand() > BROKE_LEAVE_CHANCE) continue;
       const partner = a.family?.partnerId ? w.agents[a.family.partnerId] : undefined;
-      if (partner && (!broke(partner) || partner.id === w.mayorId)) continue; // l'autre fait vivre le foyer
+      if (partner && (!(broke(partner) || hungry(partner)) || partner.id === w.mayorId)) continue; // l'autre fait vivre le foyer
       const leaving = [a, ...(partner ? [partner] : [])];
       // Les enfants encore à la maison suivent leurs parents.
       const kids = leaving.flatMap((p) => p.family?.childIds ?? []).map((k) => w.agents[k]).filter((k): k is Agent => !!k && !isAdult(w, k));
@@ -304,8 +315,9 @@ export class Life {
       for (const x of all) this.leave(sim, x);
       const names = leaving.map((x) => x.name).join(' et ');
       const withKids = kids.length ? `, avec ${kids.length > 1 ? 'les enfants' : kids[0].name}` : '';
+      const why = starving(a) ? 'Le ventre vide depuis des jours' : 'Plus un sou et pas de travail';
       sim.emit('agent.left', all.map((x) => x.id),
-        `🧳 Plus un sou et pas de travail : ${names} ${leaving.length > 1 ? 'partent tenter leur' : 'part tenter sa'} chance ailleurs${withKids}.`, { agentId: a.id, broke: true, sad });
+        `🧳 ${why} : ${names} ${leaving.length > 1 ? 'partent tenter leur' : 'part tenter sa'} chance ailleurs${withKids}.`, { agentId: a.id, broke: true, hungry: starving(a), sad });
       sim.broadcastPatch({ houses: w.houses });
       sim.touchAgents();
       return;

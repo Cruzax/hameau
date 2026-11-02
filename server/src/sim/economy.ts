@@ -6,7 +6,7 @@ import {
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
   CHILD_BREAD, OUTPUT_GOOD, OWNER_KEEPS, OWNER_REFILL, STOCK_CAP, VILLAGE_TILL_FLOOR,
   BANKRUPT_AFTER_DAYS, BREAD_NEED_PER_PERSON, BREAD_PER_SLOT, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
-  ALMS, BONUS_MAX, BONUS_SHARE, POOR_BELOW, TAX_FROM, TAX_RATE, TOOL_BONUS, TOOL_WEAR, TOOLS_PER_WORKER,
+  MISHAP_CHANCE, ALMS, BONUS_MAX, BONUS_SHARE, POOR_BELOW, TAX_FROM, TAX_RATE, TOOL_BONUS, TOOL_WEAR, TOOLS_PER_WORKER,
 } from './economyConfig';
 
 /** Qui achète quoi à qui, et combien par employé (stock visé). */
@@ -261,6 +261,7 @@ export class Economy {
   /** Le soir : commerce, production, puis paie ; caisse vide trop longtemps = renvoi ; surplus au patron. */
   evening(sim: Sim) {
     const w = sim.world;
+    this.mishaps(sim);
     this.refinance(sim);
     this.trade(sim);
     this.produce(sim);
@@ -300,6 +301,32 @@ export class Economy {
     }
     this.tax(sim);
     if (this.growth) this.grow(sim);
+  }
+
+  /**
+   * Les coups durs : un commerce privé peut perdre une bonne part de sa caisse et de ses réserves.
+   * Le village renfloue ses propres lieux ; un patron, lui, peut y laisser sa boutique.
+   */
+  mishaps(sim: Sim) {
+    const w = sim.world;
+    if (!this.growth) return; // économie figée des tests : pas d'imprévu
+    for (const wp of Object.values(w.workplaces)) {
+      const boss = wp.ownerId ? w.agents[wp.ownerId] : undefined;
+      if (!boss || Math.random() >= MISHAP_CHANCE) continue;
+      const table: Record<string, [string, number]> = {
+        ferme: [`🌨 La grêle couche les blés de la ferme de ${boss.name} : la récolte est perdue.`, 0.5],
+        forge: [`🔥 Un départ de feu à la forge de ${boss.name} : l’atelier est à reconstruire.`, 0.6],
+        boulangerie: [`🔥 Le four de la boulangerie de ${boss.name} s’effondre : plus de fournée pendant un moment.`, 0.5],
+        moulin: [`💨 Une aile du moulin de ${boss.name} se brise en pleine tempête.`, 0.5],
+        scierie: [`🪚 La grande scie de ${boss.name} casse net : réparation hors de prix.`, 0.5],
+        auberge: [`🍺 Une bagarre ravage l’auberge de ${boss.name}.`, 0.4],
+        herboristerie: [`🌿 Les réserves de l’herboristerie de ${boss.name} ont moisi.`, 0.4],
+      };
+      const [text, lost] = table[wp.kind];
+      wp.till = Math.floor(wp.till * (1 - lost));
+      for (const g of Object.keys(wp.stock) as Good[]) wp.stock[g] = Math.floor((wp.stock[g] ?? 0) * (1 - lost));
+      sim.emit('village.event', [boss.id], text, { mishap: wp.kind, workplaceId: wp.id });
+    }
   }
 
   /**

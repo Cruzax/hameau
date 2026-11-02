@@ -51,7 +51,9 @@ export const BREAD_PER_SLOT: Partial<Record<WorkplaceKind, number>> = { boulange
 /** Mise de départ d'un fondateur, qui devient patron. */
 export const FOUNDING_COST = 20;
 /** Soirs d'affilée sans de quoi payer un salaire avant la faillite. */
-export const BANKRUPT_AFTER_DAYS = 7;
+export const BANKRUPT_AFTER_DAYS = 5;
+/** Chaque soir, un commerce privé a cette chance d'essuyer un coup dur (incendie, grêle, casse…). */
+export const MISHAP_CHANCE = 0.025;
 
 /** Le village remet ses propres caisses à ce niveau chaque soir. */
 export const VILLAGE_TILL_FLOOR = 30;
