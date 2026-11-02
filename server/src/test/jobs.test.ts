@@ -48,7 +48,9 @@ test('trois soirs sans paie : le dernier embauché est renvoyé', () => {
 
 test('un salarié part pour un emploi mieux payé dès qu’une place se libère', () => {
   const { sim, w, eco } = setup([{ kind: 'ferme', till: 100 }, { kind: 'forge', till: 100 }]);
-  const [a, b] = Object.values(w.agents);
+  w.workplaces['wp-0'].slots = 2;
+  const [a, b, c] = Object.values(w.agents);
+  eco.hire(sim, c.id, 'wp-0'); // la ferme garde quelqu'un
   eco.hire(sim, a.id, 'wp-0'); // ferme : 3
   eco.hire(sim, b.id, 'wp-1'); // forge : 6, seule place prise
   for (const x of Object.values(w.agents)) if (!x.job) x.job = { workplaceId: 'aucun', since: 0, wage: 0 };
@@ -58,8 +60,8 @@ test('un salarié part pour un emploi mieux payé dès qu’une place se libère
   assert.equal(a.job?.workplaceId, 'wp-1');
 });
 
-test('le patron empoche ce qui dépasse le fonds de caisse', () => {
-  const { sim, w, eco } = setup([{ kind: 'moulin', till: 50 }]);
+test('le patron prend la moitié de ce qui dépasse le fonds de caisse', () => {
+  const { sim, w, eco } = setup([{ kind: 'moulin', till: 60 }]);
   const [boss, worker] = Object.values(w.agents);
   w.workplaces['wp-0'].ownerId = boss.id;
   eco.hire(sim, worker.id, 'wp-0');
@@ -67,7 +69,35 @@ test('le patron empoche ce qui dépasse le fonds de caisse', () => {
   const before = boss.inventory?.pieces ?? 5;
   eco.morning(sim);
   eco.evening(sim);
-  // 50 - 4 de salaire = 46 ; la caisse garde 30, le patron prend 16.
-  assert.equal(w.workplaces['wp-0'].till, 30);
-  assert.equal(boss.inventory!.pieces, before + 16);
+  // 60 - 4 de salaire = 56 ; au-dessus de 40, 16 de surplus : le patron en prend 8, la caisse garde 48.
+  assert.equal(w.workplaces['wp-0'].till, 48);
+  assert.equal(boss.inventory!.pieces, before + 8);
+});
+
+test('un lieu tenu par le village garde son argent', () => {
+  const { sim, w, eco } = setup([{ kind: 'moulin', till: 60 }]);
+  const mayor = w.agents[w.mayorId];
+  const before = mayor.inventory?.pieces ?? 5;
+  eco.evening(sim);
+  assert.equal(w.workplaces['wp-0'].till, 60);
+  assert.equal(mayor.inventory!.pieces, before);
+});
+
+test('un lieu sans personne est pourvu en premier, même s’il paie moins', () => {
+  const { sim, w, eco } = setup([{ kind: 'forge', till: 100 }, { kind: 'ferme', till: 100 }]);
+  w.workplaces['wp-0'].slots = 2;
+  const [a, b] = Object.values(w.agents);
+  eco.hire(sim, a.id, 'wp-0');
+  for (const x of Object.values(w.agents)) if (x.id !== b.id && !x.job) x.job = { workplaceId: 'aucun', since: 0, wage: 0 };
+  eco.morning(sim);
+  assert.equal(b.job?.workplaceId, 'wp-1');
+});
+
+test('le seul employé d’un lieu ne le quitte pas pour mieux payé', () => {
+  const { sim, w, eco } = setup([{ kind: 'ferme', till: 100 }, { kind: 'forge', till: 100 }]);
+  const [a] = Object.values(w.agents);
+  eco.hire(sim, a.id, 'wp-0');
+  for (const x of Object.values(w.agents)) if (!x.job) x.job = { workplaceId: 'aucun', since: 0, wage: 0 };
+  eco.morning(sim);
+  assert.equal(a.job?.workplaceId, 'wp-0');
 });

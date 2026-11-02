@@ -15,7 +15,7 @@ export const FIRE_AFTER_UNPAID_DAYS = 3;
 /** Absences sur les 7 derniers jours avant un renvoi. */
 export const FIRE_AFTER_ABSENCES = 3;
 /** Le patron empoche ce qui dépasse ce fonds de caisse. */
-export const TILL_FLOAT = 30;
+export const TILL_FLOAT = 40;
 
 /** Production par employé présent et par jour. Le moulin transforme le blé, la boulangerie la farine et le bois. */
 export const OUTPUT_PER_WORKER = { ble: 6, bois: 4, farine: 6, pain: 12, outils: 1 } as const;
@@ -36,6 +36,10 @@ export const GIFTS_PER_DAY = 4;
 export const ESSENTIAL: WorkplaceKind[] = ['boulangerie', 'ferme', 'moulin', 'scierie'];
 /** Poids des métiers quand on ouvre un lieu de plus pour les sans-emploi (plus de fermes que de forges). */
 export const GROWTH_WEIGHT: Partial<Record<WorkplaceKind, number>> = { ferme: 2, boulangerie: 1.5, moulin: 1, scierie: 1, forge: 0.5 };
+/** Pains par habitant et par jour à pouvoir produire (un pain rend 0,6 de satiété ; on en perd 0,9 par jour). */
+export const BREAD_NEED_PER_PERSON = 1.6;
+/** Pains par jour que permet un poste occupé, maillon par maillon (12 cuits, 6 farines × 3, 6 blés × 3, 4 bûches × 6). */
+export const BREAD_PER_SLOT: Partial<Record<WorkplaceKind, number>> = { boulangerie: 12, moulin: 18, ferme: 18, scierie: 24 };
 /** Mise de départ d'un fondateur, qui devient patron. */
 export const FOUNDING_COST = 20;
 /** Soirs d'affilée sans de quoi payer un salaire avant la faillite. */

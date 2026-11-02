@@ -65,3 +65,13 @@ test('chaque lieu de travail porte l’époque ancienne', () => {
   const wp: Workplace = newWorkplace(sim, 'ferme', null)!;
   assert.equal(wp.era, 'ancienne');
 });
+
+test('pas assez de pain pour tout le monde : une boulangerie de plus', () => {
+  const { sim, w, eco } = village([
+    { kind: 'boulangerie', till: 30 }, { kind: 'ferme', till: 30 }, { kind: 'moulin', till: 30 }, { kind: 'scierie', till: 30 },
+  ]);
+  // 13 habitants : il faut ~21 pains par jour ; une boulangerie à 1 poste n'en cuit que 12.
+  Object.values(w.workplaces).find((x) => x.kind === 'boulangerie')!.slots = 1;
+  eco.evening(sim);
+  assert.equal(Object.values(w.workplaces).filter((x) => x.kind === 'boulangerie').length, 2);
+});

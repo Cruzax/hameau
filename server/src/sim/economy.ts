@@ -4,7 +4,7 @@ import { newWorkplace } from './god';
 import {
   BAKERY_RESERVE, BREAD_PER_FLOUR, BREAD_PER_PURCHASE, BREAD_PER_WOOD, FIRE_AFTER_ABSENCES, FIRE_AFTER_UNPAID_DAYS, GIFTS_PER_DAY,
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
-  BANKRUPT_AFTER_DAYS, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
+  BANKRUPT_AFTER_DAYS, BREAD_NEED_PER_PERSON, BREAD_PER_SLOT, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
 } from './economyConfig';
 
 /** Qui achète quoi à qui, et combien par employé (stock visé). */
@@ -93,14 +93,18 @@ export class Economy {
   morning(sim: Sim) {
     const w = sim.world;
     const day = w.clock.day;
-    const open = () => Object.values(w.workplaces).filter((wp) => wp.workers.length < wp.slots).sort((x, y) => WAGES[y.kind] - WAGES[x.kind]);
+    // Un lieu vide passe avant tout (sinon personne ne va à la ferme, la moins payée), puis le meilleur salaire.
+    const open = () => Object.values(w.workplaces).filter((wp) => wp.workers.length < wp.slots)
+      .sort((x, y) => Number(y.workers.length === 0) - Number(x.workers.length === 0) || WAGES[y.kind] - WAGES[x.kind]);
     for (const a of Object.values(w.agents)) {
       if (!isAdult(w, a)) continue;
       const current = this.jobOf(w, a.id);
       if (a.job && !current) continue; // emploi hors des lieux de travail (cas des tests) : on n'y touche pas
       const best = open()[0];
       if (!best) continue;
-      if (!current || WAGES[best.kind] >= WAGES[current.kind] + SWITCH_IF_BETTER_BY) this.hire(sim, a.id, best.id);
+      // On ne laisse pas un lieu sans personne pour gagner un peu plus ailleurs.
+      const canLeave = current && current.workers.length > 1;
+      if (!current || (canLeave && WAGES[best.kind] >= WAGES[current.kind] + SWITCH_IF_BETTER_BY)) this.hire(sim, a.id, best.id);
     }
     // Le potager : un pain par jour pour qui n'a pas d'emploi.
     for (const a of Object.values(w.agents)) if (isAdult(w, a) && !a.job) invOf(a).pain += SUBSISTENCE_BREAD;
@@ -236,13 +240,12 @@ export class Economy {
         this.quit(sim, wp.workers[wp.workers.length - 1], 'plus de quoi payer les salaires');
         wp.unpaidDays = 0;
       }
-      // Le patron (ou, pour un lieu du village, le maire) empoche le surplus.
-      const bossId = wp.ownerId ?? w.mayorId;
-      const boss = w.agents[bossId];
+      // Le patron prend la moitié de ce qui dépasse le fonds de caisse ; un lieu du village garde tout.
+      const boss = wp.ownerId ? w.agents[wp.ownerId] : undefined;
       if (boss && wp.till > TILL_FLOAT) {
-        const inv = (boss.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
-        inv.pieces += wp.till - TILL_FLOAT;
-        wp.till = TILL_FLOAT;
+        const share = Math.floor((wp.till - TILL_FLOAT) / 2);
+        invOf(boss).pieces += share;
+        wp.till -= share;
       }
       // Caisse vide trop longtemps : faillite.
       const broke = wp.till < Math.min(...Object.values(WAGES)) ? (this.brokeDays.get(wp.id) ?? 0) + 1 : 0;
@@ -270,6 +273,13 @@ export class Economy {
     const w = sim.world;
     const count = (k: WorkplaceKind) => Object.values(w.workplaces).filter((x) => x.kind === k).length;
     let kind = ESSENTIAL.find((k) => !count(k));
+    // Pas assez de pain possible pour tout le monde : le maillon le plus faible de la chaîne s'agrandit.
+    if (!kind) {
+      const need = Object.keys(w.agents).length * BREAD_NEED_PER_PERSON;
+      const capacity = (k: WorkplaceKind) => Object.values(w.workplaces).filter((x) => x.kind === k).reduce((n, x) => n + x.slots, 0) * BREAD_PER_SLOT[k]!;
+      const weakest = ESSENTIAL.map((k) => ({ k, ratio: capacity(k) / need })).sort((a, b) => a.ratio - b.ratio)[0];
+      if (weakest.ratio < 1) kind = weakest.k;
+    }
     if (!kind) {
       const jobless = Object.values(w.agents).filter((a) => isAdult(w, a) && !a.job).length;
       const openSlot = Object.values(w.workplaces).some((x) => x.workers.length < x.slots);
