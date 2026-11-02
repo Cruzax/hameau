@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useHameau } from '../net/store';
+import { useUI } from './uiStore';
 
 // Écran de chargement : le soleil se lève sur le hameau pendant que la simulation se connecte.
 
@@ -35,7 +36,11 @@ export function LoadingScreen() {
   const ready = connected && minElapsed;
   useEffect(() => {
     if (!ready) return;
-    const t = setTimeout(() => setGone(true), 700); // le temps du fondu
+    const t = setTimeout(() => {
+      setGone(true);
+      // Chaque visite repart d'un village neuf : on propose tout de suite de composer ses fondateurs.
+      useUI.getState().set({ starting: true });
+    }, 700); // le temps du fondu
     return () => clearTimeout(t);
   }, [ready]);
 
