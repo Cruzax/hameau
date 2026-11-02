@@ -5,3 +5,4 @@ export * from './geometry';
 export * from './providers';
 export * from './time';
 export * from './french';
+export * from './terrain';

@@ -1,7 +1,7 @@
 import {
   dist,
-  distToPolyline,
   facing,
+  isBuildable,
   type Agent,
   type AgentId,
   type ClientToServer,
@@ -60,21 +60,28 @@ export function buildRoad(sim: Sim, a: HouseId, b: HouseId, waypoints: Vec2[] = 
 }
 
 /** Emplacement libre près d'une maison : loin des autres maisons, de la rivière et de la place. */
-export function findSpot(sim: Sim, near: House): Vec2 | null {
+/** Écart minimal entre deux bâtiments (maisons, lieux de travail, carrefours). */
+const MIN_GAP = 5.5;
+
+/**
+ * Emplacement libre près de `near`, sur des anneaux de rayon 6 à 14.
+ * Sans `prefer`, le premier qui convient ; avec, le meilleur score (le plus grand).
+ */
+export function findSpot(sim: Sim, near: Vec2, prefer?: (p: Vec2) => number): Vec2 | null {
   const w = sim.world;
-  const { plaza, river } = w.terrain;
-  for (const radius of [7, 8.5, 10, 12]) {
-    for (let k = 0; k < 16; k++) {
-      const angle = (k / 16) * Math.PI * 2 + radius;
-      const p = { x: near.position.x + Math.cos(angle) * radius, z: near.position.z + Math.sin(angle) * radius };
-      if (Math.abs(p.x) > 22 || Math.abs(p.z) > 20) continue;
-      if (dist(p, plaza.center) < plaza.radius + 4) continue;
-      if (distToPolyline(p, river.points) < river.width / 2 + 3.5) continue;
-      if (Object.values(w.houses).some((h) => dist(p, h.position) < 6.5)) continue;
-      return p;
+  let best: { p: Vec2; score: number } | null = null;
+  for (const radius of [6, 7.5, 9, 10.5, 12, 14]) {
+    for (let k = 0; k < 20; k++) {
+      const angle = (k / 20) * Math.PI * 2 + radius;
+      const p = { x: near.x + Math.cos(angle) * radius, z: near.z + Math.sin(angle) * radius };
+      if (!isBuildable(p, w)) continue;
+      if (Object.values(w.houses).some((h) => dist(p, h.position) < MIN_GAP)) continue;
+      if (!prefer) return p;
+      const score = prefer(p);
+      if (!best || score > best.score) best = { p, score };
     }
   }
-  return null;
+  return best?.p ?? null;
 }
 
 export function slug(sim: Sim, name: string) {
@@ -87,7 +94,7 @@ export function slug(sim: Sim, name: string) {
 /** Maison neuve pour `ownerId` près de `near` (pas encore ajoutée au monde), ou null faute de place. */
 export function newHouse(sim: Sim, ownerId: AgentId, near: House, role: Role): House | null {
   const w = sim.world;
-  const spot = findSpot(sim, near);
+  const spot = findSpot(sim, near.position);
   if (!spot) return null;
   const [wall, roof] = PALETTE[Object.keys(w.houses).length % PALETTE.length];
   return {

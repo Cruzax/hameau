@@ -1,5 +1,5 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
-import { distToPolyline, type Terrain, type Vec2 } from '@hameau/shared';
+import { distToPolyline, VALLEY_RADIUS, type Terrain, type Vec2 } from '@hameau/shared';
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
@@ -27,7 +27,7 @@ export const WATER_LEVEL = -0.22;
 export function terrainHeight(x: number, z: number, terrain: Terrain): number {
   const d = Math.hypot(x, z);
   const n = Math.sin(x * 0.21) * Math.cos(z * 0.17) + 0.5 * Math.sin(x * 0.47 + z * 0.31);
-  let h = smoothstep(22, 40, d) * (2.4 + n * 1.6);
+  let h = smoothstep(VALLEY_RADIUS, 46, d) * (2.4 + n * 1.6);
   const halfW = terrain.river.width / 2;
   const rd = distToPolyline({ x, z }, riverPath(terrain));
   h = lerp(RIVER_BED, h, smoothstep(halfW * 0.6, halfW + 1.4, rd));
