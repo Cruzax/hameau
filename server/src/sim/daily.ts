@@ -50,6 +50,20 @@ export function theftUrge(a: Agent, s: { satiete: number; pain: number; pieces: 
   return 0;
 }
 
+/** Pain gardé d'avance à la maison, et heure limite pour aller en acheter. */
+const BREAD_RESERVE = 2;
+const SHOP_UNTIL = 21;
+
+/**
+ * Faut-il aller à la boulangerie ? On garde une petite réserve (les salariés n'ont que le matin et le soir),
+ * et un affamé sans le sou y va quand même : on lui offrira peut-être un pain.
+ */
+export function wantsBread(n: { satiete: number }, inv: { pain: number; pieces: number }, hour: number): boolean {
+  if (hour < 6 || hour >= SHOP_UNTIL) return false;
+  const broke = inv.pieces < PRICES.pain && n.satiete < 0.25 && inv.pain === 0;
+  return (inv.pain < BREAD_RESERVE && inv.pieces >= PRICES.pain) || broke;
+}
+
 export class Daily {
   readonly justice = new Justice();
   private lastNeedsPatch = 0;
@@ -317,8 +331,7 @@ export class Daily {
 
     // Faim et plus de pain : à la boulangerie.
     const bakery = sim.economy.bestBakery(sim.world);
-    const broke = inv.pieces < PRICES.pain && n.satiete < 0.25;
-    if (canShop && n.satiete < 0.55 && inv.pain === 0 && (inv.pieces >= PRICES.pain || broke) && bakery && hour < 19) {
+    if (canShop && bakery && wantsBread(n, inv, hour)) {
       this.nextShop.set(a.id, sim.clock.tick + 30);
       if (this.trip(sim, a, bakery.houseId, 'acheter', 0.4)) return;
     }

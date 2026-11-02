@@ -78,3 +78,14 @@ test('un enfant reçoit deux pains du potager familial', () => {
   eco.morning(sim);
   assert.equal(kid.inventory.pain, 2);
 });
+
+import { wantsBread } from '../sim/daily';
+
+test('on garde une petite réserve de pain, et on peut en acheter jusqu’à 21 h', () => {
+  const fed = { satiete: 0.8 };
+  assert.equal(wantsBread(fed, { pain: 1, pieces: 4 }, 20), true);
+  assert.equal(wantsBread(fed, { pain: 2, pieces: 4 }, 12), false);
+  assert.equal(wantsBread(fed, { pain: 0, pieces: 4 }, 22), false);
+  assert.equal(wantsBread(fed, { pain: 0, pieces: 0 }, 12), false);
+  assert.equal(wantsBread({ satiete: 0.1 }, { pain: 0, pieces: 0 }, 12), true); // affamé sans le sou : il demande
+});
