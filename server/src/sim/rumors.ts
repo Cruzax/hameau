@@ -51,7 +51,7 @@ export function createRumor(sim: Sim, origin: AgentId, kind: RumorKind, about: A
 
 /** Ce qu'un habitant sait et que l'autre ignore (la rumeur la plus récente). */
 export function rumorToShare(sim: Sim, speaker: Agent, listener: Agent): Rumor | undefined {
-  return [...sim.world.rumors].reverse().find((r) => r.knownBy.includes(speaker.id) && !r.knownBy.includes(listener.id) && r.about !== listener.id);
+  return [...sim.world.rumors].reverse().find((r) => r.knownBy.includes(speaker.id) && !r.knownBy.includes(listener.id) && r.about !== listener.id && r.about !== speaker.id);
 }
 
 /**

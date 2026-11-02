@@ -7,6 +7,7 @@ import {
 } from '../content/gazette';
 import { takeNews } from '../content/news';
 import { neighbors } from '../sim/network';
+import { BANKS } from '../content/dialogue';
 import { gazetteStaff } from '../sim/newsworthy';
 
 // Réponses scriptées du mode mock : zéro appel LLM, comportement crédible pour tester la simulation.
@@ -14,14 +15,8 @@ import { gazetteStaff } from '../sim/newsworthy';
 const TASKS = ['Trouve-nous un sujet pour la gazette du jour !', 'Il me faut un sujet avant midi. Au travail !', 'La gazette n’attend pas : un sujet, vite.'];
 const SCOUTING = ['Je file voir du côté de la rivière…', 'J’ai entendu des rumeurs près du puits !', 'Il se passe toujours quelque chose au pont.'];
 const CAMPAIGN = ['Il est temps de changer de maire !', 'Ce maire ne nous écoute pas. Vote avec moi.', 'Une autre gazette est possible !'];
-export const CHATTER: Partial<Record<Role, string[]>> = {
-  MAIRE: ['Tout se passe comme prévu ?', 'N’oubliez pas qui tient ce village.'],
-  ECLAIREUR: ['Tu as vu le ciel ce matin ?', 'J’ai une piste, je t’en dis plus bientôt !'],
-  ECRIVAIN: ['Je cherche une rime à « rivière »…', 'L’éditeur va encore tout couper.'],
-  EDITEUR: ['Trois fautes dans ta dernière lettre.', 'Sois bref.'],
-  LECTEUR: ['On ne m’écoute jamais, de ce côté du pont.', 'La gazette d’hier était longue.'],
-  CITOYEN: ['Belle journée pour couper du bois.', 'Tu as des nouvelles de la mairie ?'],
-};
+/** Messages amicaux entre habitants : les mêmes répliques familières que dans la rue. */
+export const CHATTER: Partial<Record<Role, string[]>> = BANKS.BY_ROLE;
 
 const decision = (d: Partial<Decision>): Decision => ({ thought: '', messages: [], publish: null, opinions: [], go: null, ...d });
 

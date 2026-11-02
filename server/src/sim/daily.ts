@@ -11,7 +11,7 @@ import {
   type TripPurpose,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
-import { placeName as workplaceName } from './economy';
+import { isAdult, placeName as workplaceName } from './economy';
 import { PRICES, WORK_HOURS } from './economyConfig';
 import { isActive } from './effects';
 import { findPath } from './paths';
@@ -62,6 +62,22 @@ export function wantsBread(n: { satiete: number }, inv: { pain: number; pieces: 
   if (hour < 6 || hour >= SHOP_UNTIL) return false;
   const broke = inv.pieces < PRICES.pain && n.satiete < 0.25 && inv.pain === 0;
   return (inv.pain < BREAD_RESERVE && inv.pieces >= PRICES.pain) || broke;
+}
+
+/** Ce qui arrive vraiment à celui qui parle : son travail, celui de l'autre, la dernière gazette, son couple. */
+function talkSituation(sim: Sim, speaker: Agent, listener: Agent) {
+  const w = sim.world;
+  const job = sim.economy.jobOf(w, speaker.id);
+  const listenerJob = sim.economy.jobOf(w, listener.id);
+  const recent = w.gazettes.at(-1);
+  const partner = speaker.family?.partnerId ? w.agents[speaker.family.partnerId]?.name : undefined;
+  return {
+    job: job && workplaceName(job),
+    listenerJob: listenerJob && workplaceName(listenerJob),
+    jobless: !speaker.job && isAdult(w, speaker),
+    headline: recent && w.clock.day - recent.day <= 1 ? recent.headline : undefined,
+    partner,
+  };
 }
 
 export class Daily {
@@ -572,6 +588,7 @@ export class Daily {
           speaker, listener, mutual, place: where, dayName: dayName(sim.clock.day),
           night: isNight(sim.clock), storm: isActive(sim, 'storm'), flood: isActive(sim, 'flood'),
           mayorName: sim.agent(sim.world.mayorId)?.name ?? '', mayorOpinion: speaker.opinions[sim.world.mayorId] ?? 0,
+          ...talkSituation(sim, speaker, listener),
         });
         line = ex.line;
         sim.adjustOpinion(speaker.id, listener.id, ex.bond);
