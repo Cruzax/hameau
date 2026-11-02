@@ -57,3 +57,18 @@ export const OWNER_KEEPS = 10;
 export const STOCK_CAP = 60;
 /** Ce que chaque lieu produit. */
 export const OUTPUT_GOOD: Partial<Record<WorkplaceKind, Good>> = { ferme: 'ble', scierie: 'bois', moulin: 'farine', boulangerie: 'pain', forge: 'outils' };
+
+// ─── Faire circuler l'argent ─────────────────────────────────────────────────
+
+/** Part du bénéfice du patron reversée en prime aux employés présents… */
+export const BONUS_SHARE = 0.3;
+/** …dans la limite de ce montant par employé et par soir. */
+export const BONUS_MAX = 3;
+/** Au-delà de cette fortune, on paie l'impôt du village… */
+export const TAX_FROM = 100;
+/** …ce pourcentage de ce qui dépasse, chaque soir. */
+export const TAX_RATE = 0.05;
+/** L'impôt va d'abord aux adultes qui ont moins que ceci… */
+export const POOR_BELOW = 5;
+/** …à raison de ce montant chacun au plus ; le reste renfloue les caisses des commerces. */
+export const ALMS = 4;

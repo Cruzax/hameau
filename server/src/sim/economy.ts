@@ -6,6 +6,7 @@ import {
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
   CHILD_BREAD, OUTPUT_GOOD, OWNER_KEEPS, OWNER_REFILL, STOCK_CAP, VILLAGE_TILL_FLOOR,
   BANKRUPT_AFTER_DAYS, BREAD_NEED_PER_PERSON, BREAD_PER_SLOT, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
+  ALMS, BONUS_MAX, BONUS_SHARE, POOR_BELOW, TAX_FROM, TAX_RATE,
 } from './economyConfig';
 
 /** Qui achète quoi à qui, et combien par employé (stock visé). */
@@ -271,10 +272,14 @@ export class Economy {
         wp.unpaidDays = 0;
       }
       // Le patron prend la moitié de ce qui dépasse le fonds de caisse ; un lieu du village garde tout.
+      // Quand ça marche, une partie de ce bénéfice part en prime aux employés présents.
       const boss = wp.ownerId ? w.agents[wp.ownerId] : undefined;
       if (boss && wp.till > TILL_FLOAT) {
         const share = Math.floor((wp.till - TILL_FLOAT) / 2);
-        invOf(boss).pieces += share;
+        const staff = wp.workers.filter((id) => id !== boss.id && this.paidToday.has(id) && w.agents[id]);
+        const bonus = staff.length ? Math.min(BONUS_MAX, Math.floor((share * BONUS_SHARE) / staff.length)) : 0;
+        for (const id of staff) invOf(w.agents[id]).pieces += bonus;
+        invOf(boss).pieces += share - bonus * staff.length;
         wp.till -= share;
       }
       // Caisse vide trop longtemps : faillite.
@@ -282,7 +287,37 @@ export class Economy {
       this.brokeDays.set(wp.id, broke);
       if (broke >= BANKRUPT_AFTER_DAYS) this.close(sim, wp);
     }
+    this.tax(sim);
     if (this.growth) this.grow(sim);
+  }
+
+  /**
+   * L'impôt du village : chaque soir, les grosses fortunes donnent un peu de ce qui dépasse.
+   * L'argent va d'abord aux plus pauvres, puis aux caisses des commerces les plus à sec.
+   */
+  tax(sim: Sim) {
+    const w = sim.world;
+    let pool = 0;
+    for (const a of Object.values(w.agents)) {
+      const inv = invOf(a);
+      if (inv.pieces <= TAX_FROM) continue;
+      const due = Math.floor((inv.pieces - TAX_FROM) * TAX_RATE);
+      inv.pieces -= due;
+      pool += due;
+    }
+    if (!pool) return;
+    const poor = Object.values(w.agents).filter((a) => isAdult(w, a) && invOf(a).pieces < POOR_BELOW).sort((x, y) => invOf(x).pieces - invOf(y).pieces);
+    let helped = 0;
+    for (const a of poor) {
+      if (!pool) break;
+      const give = Math.min(ALMS, pool);
+      invOf(a).pieces += give;
+      pool -= give;
+      helped++;
+    }
+    const shops = Object.values(w.workplaces).sort((x, y) => x.till - y.till);
+    if (pool && shops.length) shops[0].till += pool;
+    if (helped) sim.emit('village.event', [], `💰 L’impôt du village vient en aide à ${helped} habitant${helped > 1 ? 's' : ''} dans le besoin.`, { helped });
   }
 
   /** Faillite : tout le monde perd son emploi, le bâtiment reste vide (un futur lieu pourra le reprendre). */

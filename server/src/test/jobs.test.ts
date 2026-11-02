@@ -62,18 +62,32 @@ test('un salarié part pour un emploi mieux payé dès qu’une place se libère
   assert.equal(a.job?.workplaceId, 'wp-1');
 });
 
-test('le patron prend la moitié de ce qui dépasse le fonds de caisse', () => {
+test('le patron prend la moitié de ce qui dépasse le fonds de caisse, et en reverse une prime', () => {
   const { sim, w, eco } = setup([{ kind: 'moulin', till: 60 }]);
   const [boss, worker] = Object.values(w.agents);
   w.workplaces['wp-0'].ownerId = boss.id;
   eco.hire(sim, worker.id, 'wp-0');
   for (const x of Object.values(w.agents)) if (!x.job) x.job = { workplaceId: 'aucun', since: 0, wage: 0 };
   const before = boss.inventory?.pieces ?? 5;
+  const workerBefore = worker.inventory?.pieces ?? 5;
   eco.morning(sim);
+  (eco as unknown as { present: Set<string> }).present.add(worker.id); // l'employé est venu travailler
   eco.evening(sim);
   // 60 - 4 de salaire = 56 ; au-dessus de 40, 16 de surplus : le patron en prend 8, la caisse garde 48.
+  // L'employé touche 30 % de ces 8 en prime (2) : le patron garde 6.
   assert.equal(w.workplaces['wp-0'].till, 48);
-  assert.equal(boss.inventory!.pieces, before + 8);
+  assert.equal(boss.inventory!.pieces, before + 6);
+  assert.equal(worker.inventory!.pieces, workerBefore + 4 + 2);
+});
+
+test('l’impôt du village prend aux grosses fortunes et donne aux plus pauvres', () => {
+  const { sim, w, eco } = setup([{ kind: 'moulin', till: 60 }]);
+  const [rich, poor] = Object.values(w.agents);
+  rich.inventory = { pain: 0, bois: 0, outils: 0, pieces: 300 };
+  poor.inventory = { pain: 0, bois: 0, outils: 0, pieces: 0 };
+  eco.tax(sim);
+  assert.equal(rich.inventory.pieces, 290);
+  assert.equal(poor.inventory.pieces, 4);
 });
 
 test('un lieu tenu par le village garde son argent', () => {
