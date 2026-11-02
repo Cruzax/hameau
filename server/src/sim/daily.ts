@@ -11,6 +11,8 @@ import {
   type TripPurpose,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
+import { placeName as workplaceName } from './economy';
+import { WORK_HOURS } from './economyConfig';
 import { isActive } from './effects';
 import { findPath } from './paths';
 import { createRumor, hottestRumor, rumorToShare, SLANDERS, tellRumor } from './rumors';
@@ -40,8 +42,6 @@ const RETRY_TICKS = 60;           // après un achat raté, on attend avant de r
 
 /** Qui coupe du bois le matin (les métiers sans production propre). */
 const WOODCUTTERS: Role[] = ['CITOYEN', 'ECLAIREUR', 'LECTEUR', 'VOLEUR', 'MENTEUR', 'BARDE', 'ECRIVAIN', 'EDITEUR'];
-/** Payés par le maire chaque matin, pour l'entretien du village. */
-const SALARIED: Role[] = ['CRIEUR', 'GARDE', 'FORGERON'];
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
@@ -117,6 +117,8 @@ export class Daily {
     if (place === 'place') return 'la place';
     if (place === 'foret') return 'la forêt';
     if (place === 'riviere') return 'la rivière';
+    const wp = Object.values(sim.world.workplaces).find((x) => x.houseId === place);
+    if (wp) return workplaceName(wp);
     const owner = sim.world.houses[place]?.ownerId;
     const o = owner ? sim.agent(owner) : undefined;
     if (!o) return 'une maison vide';
@@ -251,14 +253,6 @@ export class Daily {
         const tax = Math.ceil((inv.pieces - TAX_THRESHOLD) / 10);
         inv.pieces -= tax;
         this.inv(mayor).pieces += tax;
-      }
-      // Salaires : le maire paie le crieur et le garde chaque matin, s'il en a les moyens.
-      if (SALARIED.includes(a.role) && mayor && mayor.id !== a.id) {
-        const mi = this.inv(mayor);
-        if (mi.pieces >= 2) {
-          mi.pieces -= 2;
-          inv.pieces += 2;
-        } else sim.adjustOpinion(a.id, mayor.id, -0.1, 'Le maire a oublié mon salaire');
       }
     }
     // Maladies du jour (plus fréquentes après un orage).
@@ -411,6 +405,13 @@ export class Daily {
     if (hour >= 18 && hour < 21 && inn && inn.id !== a.id) {
       const goes = a.role === 'BARDE' || (n.humeur > 0.3 && n.energie > 0.3 && inv.pieces >= TAVERN_PRICE && Math.random() < 0.3);
       if (goes && this.trip(sim, a, inn.houseId, 'taverne', 21.5 - hour)) return;
+    }
+
+    // Les salariés présents partent au travail à 8 h et y restent jusqu'à 17 h.
+    const job = sim.economy.jobOf(sim.world, a.id);
+    if (job && sim.economy.isPresent(a.id) && hour >= WORK_HOURS[0] && hour < WORK_HOURS[0] + 1 && !this.cutToday.has(a.id)) {
+      this.cutToday.add(a.id);
+      if (this.trip(sim, a, job.houseId, 'travail', WORK_HOURS[1] - hour)) return;
     }
 
     // Le matin, les bûcherons partent en forêt.

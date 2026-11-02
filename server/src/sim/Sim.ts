@@ -20,6 +20,7 @@ import { buildNetwork, neighbors, route } from './network';
 import { Politics } from './politics';
 import { Life } from './life';
 import { Daily } from './daily';
+import { Economy } from './economy';
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
 import { addAgent, buildRoad, cutOrReopenRoad, exileAgent } from './god';
@@ -80,6 +81,8 @@ export class Sim {
   life = new Life();
   /** Vie quotidienne : besoins, métiers, déplacements, rumeurs, justice. */
   daily = new Daily();
+  /** Emplois, salaires, lieux de travail. */
+  economy = new Economy();
   /** Vie du village (couples, naissances, constructions…). Désactivable avec LIFE_ENABLED=false. */
   lifeEnabled = process.env.LIFE_ENABLED !== 'false';
   private nextMsgId = 1;
@@ -153,11 +156,13 @@ export class Sim {
     this.emit('day.start', [], `☀️ Jour ${this.clock.day} — le village se réveille.`);
     this.world.gazetteDraft = { day: this.clock.day };
     this.daily.morning(this);
+    this.economy.morning(this);
     this.brain.onDayStart(this);
   }
 
   private endDay() {
     const published = this.world.gazettes.some((g) => g.day === this.clock.day);
+    this.economy.evening(this);
     this.brain.onDayEnd?.(this);
     this.politics.onDayEnd(this, published);
     if (this.lifeEnabled) {
@@ -503,6 +508,7 @@ export class Sim {
     this.politics = new Politics();
     this.life = new Life();
     this.daily = new Daily();
+    this.economy = new Economy();
     this.journal.restart();
     clearNews();
     buildNetwork(this, { silent: true });
