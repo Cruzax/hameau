@@ -1,5 +1,5 @@
 import { env } from '../env';
-import { attracted, isDwelling, mulberry32, randomOrientation, ROLE_LABEL, type Agent, type AgentId, type Role } from '@hameau/shared';
+import { attracted, isDwelling, mulberry32, randomOrientation, ROLE_LABEL, type Agent, type AgentId, type Role, type WorldState } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode, neighbors } from './network';
 import { newHouse, slug } from './god';
@@ -39,6 +39,15 @@ function homeSite(sim: Sim) {
 
 const pairKey = (a: AgentId, b: AgentId) => [a, b].sort().join('|');
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+/** Ceux que ces départs rendent tristes : la famille et les proches qui restent. */
+export function mourners(w: WorldState, leaving: Agent[]): AgentId[] {
+  const ids = new Set(leaving.map((a) => a.id));
+  return Object.values(w.agents)
+    .filter((o) => !ids.has(o.id))
+    .filter((o) => leaving.some((a) => (o.opinions[a.id] ?? 0) > 0.35 || o.family?.partnerId === a.id || o.family?.parentIds.includes(a.id) || o.family?.childIds.includes(a.id)))
+    .map((o) => o.id);
+}
 
 export class Life {
   private readonly rand = mulberry32(Date.now() ^ 0x9e3779b9);
@@ -126,7 +135,7 @@ export class Life {
     this.coupledSince.set(pairKey(a.id, b.id), sim.clock.day);
     this.affinity.delete(pairKey(a.id, b.id));
     sim.emit('couple.formed', [a.id, b.id], `💞 ${a.name} et ${b.name} forment un couple !`);
-    sim.daily.scheduleParty(sim, `on célèbre le couple de ${a.name} et ${b.name}`);
+    sim.daily.scheduleParty(sim, `on célèbre le couple de ${a.name} et ${b.name}`, 'mariage', [a.id, b.id]);
     this.remember(a, `J${sim.clock.day} : je suis en couple avec ${b.name}.`);
     this.remember(b, `J${sim.clock.day} : je suis en couple avec ${a.name}.`);
     sim.touchAgents();
@@ -199,7 +208,7 @@ export class Life {
     sim.emit('agent.born', [id, a.id, b.id], adopted
       ? `🏡 ${a.name} et ${b.name} adoptent ${name} !`
       : `👶 Naissance de ${name} chez ${a.name} et ${b.name} !`, { agentId: id, agent: child, adopted });
-    sim.daily.scheduleParty(sim, `on fête la naissance de ${name}`);
+    sim.daily.scheduleParty(sim, `on fête la naissance de ${name}`, 'bapteme', [id]);
     sim.touchAgents();
   }
 
@@ -256,6 +265,7 @@ export class Life {
       const welcome = others.reduce((s, x) => s + (x.opinions[a.id] ?? 0), 0) / Math.max(1, others.length);
       const unhappy = days >= 2 || welcome < -0.4;
       if (!unhappy || a.id === w.mayorId || this.rand() > LEAVE_CHANCE) continue;
+      const sad = mourners(w, [a]);
       delete w.agents[a.id];
       const house = w.houses[a.houseId];
       if (house?.ownerId === a.id) house.ownerId = null;
@@ -263,7 +273,7 @@ export class Life {
         delete o.opinions[a.id];
         if (o.family?.partnerId === a.id) delete o.family.partnerId;
       }
-      sim.emit('agent.left', [a.id], `🧳 ${a.name} quitte le village${days >= 2 ? ', faute de route pour rejoindre les autres' : ', faute d’amis ici'}.`, { agentId: a.id });
+      sim.emit('agent.left', [a.id], `🧳 ${a.name} quitte le village${days >= 2 ? ', faute de route pour rejoindre les autres' : ', faute d’amis ici'}.`, { agentId: a.id, sad });
       sim.broadcastPatch({ houses: w.houses });
       sim.touchAgents();
       return; // un départ par soir au plus
@@ -290,11 +300,12 @@ export class Life {
       const kids = leaving.flatMap((p) => p.family?.childIds ?? []).map((k) => w.agents[k]).filter((k): k is Agent => !!k && !isAdult(w, k));
       const all = [...new Set([...leaving, ...kids])];
       if (Object.keys(w.agents).length - all.length < 4) return;
+      const sad = mourners(w, all);
       for (const x of all) this.leave(sim, x);
       const names = leaving.map((x) => x.name).join(' et ');
       const withKids = kids.length ? `, avec ${kids.length > 1 ? 'les enfants' : kids[0].name}` : '';
       sim.emit('agent.left', all.map((x) => x.id),
-        `🧳 Plus un sou et pas de travail : ${names} ${leaving.length > 1 ? 'partent tenter leur' : 'part tenter sa'} chance ailleurs${withKids}.`, { agentId: a.id, broke: true });
+        `🧳 Plus un sou et pas de travail : ${names} ${leaving.length > 1 ? 'partent tenter leur' : 'part tenter sa'} chance ailleurs${withKids}.`, { agentId: a.id, broke: true, sad });
       sim.broadcastPatch({ houses: w.houses });
       sim.touchAgents();
       return;

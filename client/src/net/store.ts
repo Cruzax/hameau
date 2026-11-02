@@ -85,8 +85,27 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
         break;
       // Vie quotidienne : ce qu'on se dit de vive voix, ce qu'on chante, ce qu'on annonce.
       case 'life.meet':
-      case 'rumor.spread':
+      case 'rumor.spread': {
         put(e.actors[0], String(p.body ?? ''), 'say');
+        // Ce que ressent celui qui écoute, juste avant de répondre.
+        const feel = { hostile: '💢', flirt: '💕', kin: '🤗', cold: '😒', friendly: Math.random() < 0.4 ? '😊' : '' }[String(p.mood)];
+        if (feel) emote(e.actors[1], feel);
+        break;
+      }
+      case 'party':
+        for (const id of e.actors) emote(id, String(p.kind) === 'mariage' ? '💍' : '🥳');
+        break;
+      case 'agent.left':
+        for (const id of (p.sad as string[] | undefined) ?? []) emote(id, '😢');
+        break;
+      case 'house.destroyed':
+        for (const id of e.actors) emote(id, '😭');
+        break;
+      case 'treasure.found':
+        put(e.actors[0], 'Un trésor ! Je suis riche !', 'news');
+        break;
+      case 'god.gift':
+        if (e.actors[0]) emote(e.actors[0], Number(p.delta) >= 0 ? '🤑' : '😱');
         break;
       case 'song':
       case 'rumor.announce':

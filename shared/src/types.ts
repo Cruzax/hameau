@@ -382,6 +382,10 @@ export interface WorldState {
   effects: WorldEffect[];
   /** Coffres qui attendent d'être trouvés. */
   treasures?: Treasure[];
+  /** Fête en cours sur la place (guirlandes) : mariage, baptême ou fête du village. */
+  festivity?: { kind: 'mariage' | 'bapteme' | 'fete'; until: number; honorees: AgentId[] };
+  /** Le nom donné au chat de la place. */
+  catName?: string;
   rumors: Rumor[];
   gazetteDraft?: GazetteDraft;
   llm: {

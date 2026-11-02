@@ -15,6 +15,7 @@ import type { Sim } from './Sim';
 import { isAdult, placeName as workplaceName } from './economy';
 import { PRICES, WORK_HOURS } from './economyConfig';
 import { homeOf } from './disasters';
+import { mourners } from './life';
 import { isActive } from './effects';
 import { findPath } from './paths';
 import { createRumor, hottestRumor, rumorToShare, SLANDERS, tellRumor } from './rumors';
@@ -30,7 +31,7 @@ const WALK_SPEED = 0.7;           // unités de monde par tick (un peu plus vite
 const DECIDE_EVERY = 12;          // chaque habitant réfléchit à son emploi du temps tous les N ticks
 const MEET_EVERY = 14;            // une conversation par lieu fréquenté, tous les N ticks en moyenne
 /** Délai avant la réponse (ticks) : les répliques s'affichent chacune à leur tour. */
-const REPLY_DELAY = 6;
+const REPLY_DELAY = 2; // ≈ 1,25 s à ×1
 const NEEDS_PATCH_EVERY = 8;      // fréquence d'envoi des besoins au site
 const TAX_THRESHOLD = 6;          // au-delà de cette somme, on paie une pièce d'impôt chaque matin
 const CARE_PRICE = 2;
@@ -103,7 +104,7 @@ export class Daily {
   readonly justice = new Justice();
   private lastNeedsPatch = 0;
   /** Fête prévue : on rassemble le village sur la place à cette heure. */
-  private party: { day: number; hour: number; reason: string } | null = null;
+  private party: { day: number; hour: number; reason: string; kind: 'mariage' | 'bapteme' | 'fete'; honorees: AgentId[] } | null = null;
   private sangToday = false;
   /** Tant que la forêt est « fermée » (loup), personne n'y va. */
   forestClosedUntil = 0;
@@ -220,6 +221,10 @@ export class Daily {
       if (text) sim.emit('village.event', [], text, { event: t.ev.id });
     }
     if (this.party && this.party.day === sim.clock.day && this.at(sim, this.party.hour)) this.startParty(sim);
+    if (sim.world.festivity && sim.clock.tick >= sim.world.festivity.until) {
+      delete sim.world.festivity;
+      sim.broadcastPatch({ festivity: undefined });
+    }
 
     for (const a of agents) {
       this.updateNeeds(sim, a, night);
@@ -618,8 +623,10 @@ export class Daily {
       const mutual = Math.min(speaker.opinions[listener.id] ?? 0, listener.opinions[speaker.id] ?? 0);
       const rumor = rumorToShare(sim, speaker, listener);
       let line: string;
+      let mood: string | undefined;
       if (mutual < -0.4) {
         line = 'Toi, je ne te parle pas.';
+        mood = 'hostile';
         sim.adjustOpinion(speaker.id, listener.id, -0.04);
         sim.adjustOpinion(listener.id, speaker.id, -0.04);
       } else if (rumor && Math.random() < 0.7) {
@@ -634,14 +641,15 @@ export class Daily {
           ...talkSituation(sim, speaker, listener),
         });
         line = ex.line;
+        mood = ex.mood;
         sim.adjustOpinion(speaker.id, listener.id, ex.bond);
         sim.adjustOpinion(listener.id, speaker.id, ex.bond);
         if (ex.reply) {
           // La réponse viendra un peu plus tard, quand la première bulle aura été lue.
-          this.replies.push({ due: sim.clock.tick + REPLY_DELAY + Math.floor(Math.random() * 3), speaker: listener.id, listener: speaker.id, text: ex.reply, place });
+          this.replies.push({ due: sim.clock.tick + REPLY_DELAY, speaker: listener.id, listener: speaker.id, text: ex.reply, place });
         }
       }
-      sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} à ${listener.name} (${where}) : « ${line} »`, { body: line, place });
+      sim.emit('life.meet', [speaker.id, listener.id], `🗨 ${speaker.name} à ${listener.name} (${where}) : « ${line} »`, { body: line, place, mood });
       sim.remember(listener.id, speaker.id, 'in', line);
     }
   }
@@ -708,15 +716,26 @@ export class Daily {
     });
   }
 
-  /** Une fête sur la place le lendemain à 17 h (mariage, naissance…). */
-  scheduleParty(sim: Sim, reason: string) {
-    this.party = { day: sim.clock.day + 1, hour: 17, reason };
+  /** Une fête sur la place le lendemain à 17 h : mariage d'un nouveau couple, baptême d'un bébé, ou simple fête. */
+  scheduleParty(sim: Sim, reason: string, kind: 'mariage' | 'bapteme' | 'fete' = 'fete', honorees: AgentId[] = []) {
+    this.party = { day: sim.clock.day + 1, hour: 17, reason, kind, honorees };
   }
 
   private startParty(sim: Sim) {
     const reason = this.party?.reason ?? 'rien de spécial';
+    const kind = this.party?.kind ?? 'fete';
+    const honorees = (this.party?.honorees ?? []).filter((id) => sim.agent(id));
     this.party = null;
-    sim.emit('party', [], `🎉 Fête sur la place : ${reason} ! Tout le village est invité.`, { reason });
+    const names = honorees.map((id) => sim.agent(id).name);
+    const text = kind === 'mariage' && names.length === 2
+      ? `💒 Mariage de ${names[0]} et ${names[1]} sur la place ! Guirlandes, musique, tout le village est invité.`
+      : kind === 'bapteme' && names.length
+        ? `🍼 Baptême de ${names[0]} sur la place ! On trinque au petit dernier du village.`
+        : `🎉 Fête sur la place : ${reason} ! Tout le village est invité.`;
+    sim.emit('party', honorees, text, { reason, kind });
+    // Les guirlandes restent jusqu'à la fin de la fête (19 h 30).
+    sim.world.festivity = { kind, honorees, until: sim.clock.tick + Math.round((sim.clock.ticksPerDay * 2.5) / 24) };
+    sim.broadcastPatch({ festivity: sim.world.festivity });
     this.gather(sim, 'fete', 17, 19);
     this.sangToday = false; // le barde chantera sur la place
   }
@@ -743,7 +762,7 @@ export class Daily {
       delete o.opinions[id];
       if (o.family?.partnerId === id) delete o.family.partnerId;
     }
-    sim.emit('agent.left', [id], `🧳 ${a.name} quitte le village après le verdict.`, { agentId: id });
+    sim.emit('agent.left', [id], `🧳 ${a.name} quitte le village après le verdict.`, { agentId: id, sad: mourners(w, [a]) });
     if (w.mayorId === id) {
       const next = Object.values(w.agents)[0];
       if (next) w.mayorId = next.id;

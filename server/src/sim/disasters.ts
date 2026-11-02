@@ -1,4 +1,4 @@
-import { de, dist, isDwelling, pointAlong, type Agent, type EffectKind, type HouseId, type Treasure, type Vec2 } from '@hameau/shared';
+import { de, dist, isDwelling, seasonOf, pointAlong, type Agent, type EffectKind, type HouseId, type Treasure, type Vec2 } from '@hameau/shared';
 import type { Sim } from './Sim';
 
 // Ce qui tombe du ciel : la météo qui arrive toute seule, la tornade qui emporte une maison, les coffres au trésor.
@@ -38,9 +38,13 @@ export function planWeather(sim: Sim): { kind: EffectKind; hour: number } | null
   const r = Math.random();
   const stormYesterday = sim.journal.events.some((e) => e.type === 'world.effect' && e.day >= day - 1 && (e.payload as { effect?: { kind?: string } }).effect?.kind === 'storm');
   let kind: EffectKind | null = null;
-  if (day >= TORNADO_MIN_DAY && targets(sim).length >= TORNADO_MIN_HOUSES && r < TORNADO_CHANCE) kind = 'tornado';
+  // Orages d'automne, tornades d'été, peu de chose l'hiver.
+  const season = seasonOf(day);
+  const stormy = { printemps: 1, ete: 1, automne: 1.5, hiver: 0.5 }[season];
+  const twister = { printemps: 0.8, ete: 1.6, automne: 1, hiver: 0.2 }[season];
+  if (day >= TORNADO_MIN_DAY && targets(sim).length >= TORNADO_MIN_HOUSES && r < TORNADO_CHANCE * twister) kind = 'tornado';
   else if (Math.random() < (stormYesterday ? FLOOD_AFTER_STORM : FLOOD_CHANCE)) kind = 'flood';
-  else if (Math.random() < STORM_CHANCE) kind = 'storm';
+  else if (Math.random() < STORM_CHANCE * stormy) kind = 'storm';
   return kind ? { kind, hour: 9 + Math.floor(Math.random() * 10) } : null;
 }
 

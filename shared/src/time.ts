@@ -33,3 +33,16 @@ export function nightLevel(hour: number): number {
   if (hour >= NIGHT_START - 1) return hour - (NIGHT_START - 1); // crépuscule 21 h → 22 h
   return 1 - (hour - NIGHT_END); // aube 5 h → 6 h
 }
+
+// ─── Saisons ─────────────────────────────────────────────────────────────────
+
+export type Season = 'printemps' | 'ete' | 'automne' | 'hiver';
+/** Une saison dure dix jours : une année au village, c'est quarante jours. */
+export const SEASON_DAYS = 10;
+const SEASONS: Season[] = ['printemps', 'ete', 'automne', 'hiver'];
+export const SEASON_LABEL: Record<Season, string> = { printemps: 'Printemps', ete: 'Été', automne: 'Automne', hiver: 'Hiver' };
+export const SEASON_ICON: Record<Season, string> = { printemps: '🌸', ete: '🌻', automne: '🍂', hiver: '❄️' };
+
+export function seasonOf(day: number): Season {
+  return SEASONS[Math.floor((Math.max(1, day) - 1) / SEASON_DAYS) % SEASONS.length];
+}

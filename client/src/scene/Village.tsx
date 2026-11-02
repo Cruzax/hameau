@@ -18,6 +18,10 @@ import { Storm } from './Storm';
 import { Flood } from './Flood';
 import { WellGlow } from './WellGlow';
 import { Treasures } from './Treasures';
+import { Festivity } from './Festivity';
+import { Snow } from './Snow';
+import { Animals } from './Animals';
+import { Lanterns } from './Lanterns';
 import { Tornado } from './Tornado';
 import { useUI } from '../ui/uiStore';
 import { approach, effectLevel, nightNow } from './effectLevel';
@@ -103,6 +107,8 @@ export function Village() {
       }
     : undefined;
   const roads = useMemo(() => Object.values(roadsById), [roadsById]);
+  // Les lieux où quelqu'un travaille en ce moment.
+  const atWork = new Set(Object.values(agents).flatMap((a) => (a.location?.kind === 'at' && a.location.purpose === 'travail' ? [a.location.place] : [])));
   // Les carrefours ne se dessinent pas : la route suffit.
   const houses = Object.values(housesById).filter((h) => h.kind !== 'carrefour');
 
@@ -131,15 +137,19 @@ export function Village() {
         const owner = h.ownerId ? agents[h.ownerId] : undefined;
         const wp = h.kind === 'travail' ? Object.values(workplaces).find((x) => x.houseId === h.id) : undefined;
         const workplace = wp && { label: WORKPLACE_LABEL[wp.kind] ?? wp.kind, boss: wp.ownerId ? agents[wp.ownerId]?.name : undefined };
-        return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} workplace={workplace} />;
+        return <House key={h.id} house={h} owner={owner} isMayor={owner?.id === mayorId} workplace={workplace} working={!!wp && atWork.has(h.id)} />;
       })}
 
       <Treasures />
+      <Festivity />
       <Tornado />
       <NatureSpots />
       <Residents />
+      <Animals />
+      <Lanterns />
 
       <Storm />
+      <Snow />
       <CameraDirector />
       <Messengers />
       <Bubbles />

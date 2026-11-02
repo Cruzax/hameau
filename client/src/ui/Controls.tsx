@@ -1,4 +1,4 @@
-import { formatHour, isNight, villageHour } from '@hameau/shared';
+import { formatHour, isNight, SEASON_ICON, SEASON_LABEL, seasonOf, villageHour } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { Estimate } from './Estimate';
 
@@ -14,7 +14,7 @@ export function Controls() {
     <div className="controls">
       <span className={`controls__dot ${connected ? 'is-on' : ''}`} title={connected ? 'Simulation connectée' : 'Serveur hors ligne'} />
       <span className="controls__time">
-        Jour {clock.day} · {isNight(clock) ? '🌙' : '☀️'} {formatHour(villageHour(clock.tick, clock.ticksPerDay))}
+        <span title={SEASON_LABEL[seasonOf(clock.day)]}>{SEASON_ICON[seasonOf(clock.day)]}</span> Jour {clock.day} · {isNight(clock) ? '🌙' : '☀️'} {formatHour(villageHour(clock.tick, clock.ticksPerDay))}
       </span>
       <button disabled={!connected} onClick={() => send({ type: clock.paused ? 'god.resume' : 'god.pause' })}>
         {clock.paused ? '▶' : '⏸'}

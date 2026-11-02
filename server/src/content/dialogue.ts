@@ -36,6 +36,8 @@ export interface Exchange {
   reply?: string;
   /** Effet sur l'estime mutuelle. */
   bond: number;
+  /** Le ton de l'échange, pour l'émotion qui s'affiche au-dessus de celui qui écoute. */
+  mood?: 'hostile' | 'flirt' | 'friendly' | 'kin' | 'cold';
 }
 
 const BY_ROLE: Partial<Record<Role, string[]>> = {
@@ -404,11 +406,11 @@ function pickFresh(lines: string[]): string {
 export function chooseExchange(c: TalkContext): Exchange {
   if (c.mutual < -0.4) {
     const [line, reply] = pick(HOSTILE);
-    return { line, reply, bond: -0.05 };
+    return { line, reply, bond: -0.05, mood: 'hostile' };
   }
   if (kin(c.speaker, c.listener) && Math.random() < 0.5) {
     const [line, reply] = pick(KIN);
-    return { line, reply, bond: 0.04 };
+    return { line, reply, bond: 0.04, mood: 'kin' };
   }
   const partners = c.speaker.family?.partnerId === c.listener.id;
   // On ne flirte qu'avec son partenaire, ou entre célibataires sans lien de famille.
@@ -416,17 +418,17 @@ export function chooseExchange(c: TalkContext): Exchange {
   const mayFlirt = partners || (c.mutual > 0.6 && single(c.speaker) && single(c.listener) && !kin(c.speaker, c.listener) && attracted(c.speaker, c.listener) && attracted(c.listener, c.speaker));
   if ((partners || c.mutual > 0.55) && Math.random() < 0.5) {
     const [line, reply] = pick(mayFlirt ? FLIRT : FRIENDLY);
-    return { line, reply, bond: 0.05 };
+    return { line, reply, bond: 0.05, mood: mayFlirt ? 'flirt' : 'friendly' };
   }
   const situational = SITUATIONS.filter((s) => s.when(c));
   if (situational.length && Math.random() < 0.6) return { line: pickFresh(pick(situational).lines(c)), bond: 0.02 };
   if (c.mutual < 0) {
     const [line, reply] = pick(COLD);
-    return { line, reply, bond: 0 };
+    return { line, reply, bond: 0, mood: 'cold' };
   }
   if (c.mutual > 0.3 && Math.random() < 0.4) {
     const [line, reply] = pick(FRIENDLY);
-    return { line, reply, bond: 0.04 };
+    return { line, reply, bond: 0.04, mood: 'friendly' };
   }
   return { line: pickFresh(BY_ROLE[c.speaker.role] ?? BY_ROLE.CITOYEN!), bond: 0.03 };
 }

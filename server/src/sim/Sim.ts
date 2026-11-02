@@ -2,6 +2,9 @@ import { env } from '../env';
 import {
   createFounderWorld,
   createSeedWorld,
+  seasonOf,
+  SEASON_ICON,
+  SEASON_LABEL,
   validateFounders,
   type FounderSpec,
   dayFraction,
@@ -207,6 +210,16 @@ export class Sim {
     this.world.gazetteDraft = { day: this.clock.day };
     this.issuesToday = 0;
     this.daily.weatherPlan = planWeather(this);
+    const season = seasonOf(this.clock.day);
+    if (this.clock.day > 1 && season !== seasonOf(this.clock.day - 1)) {
+      const text = {
+        printemps: '🌸 Le printemps revient : les arbres fleurissent, les récoltes repartent.',
+        ete: '🌻 L’été s’installe : les blés sont hauts, gare aux orages et aux tornades.',
+        automne: '🍂 L’automne arrive : les feuilles roussissent, la pluie menace.',
+        hiver: '❄️ L’hiver tombe sur le hameau : la neige couvre tout, les récoltes seront maigres.',
+      }[season];
+      this.emit('village.event', [], text, { season });
+    }
     this.daily.morning(this);
     this.economy.morning(this);
     this.brain.onDayStart(this);
@@ -315,7 +328,7 @@ export class Sim {
         const g: Gazette = {
           ...a.gazette,
           briefs: briefsSince(window, this.issueTopic?.seq),
-          weather: weatherSince(window),
+          weather: `${SEASON_ICON[seasonOf(this.clock.day)]} ${SEASON_LABEL[seasonOf(this.clock.day)]} · ${weatherSince(window)}`,
           mayorWord: mayorWord(window, this.world),
           review: a.gazette.review ?? dossier?.review,
           day: this.clock.day,
@@ -582,6 +595,14 @@ export class Sim {
       case 'god.accuse':
         if (!this.daily.justice.frame(this, c.agentId)) this.emit('god.inject', [], '⚖️ Une affaire est déjà en cours : le village attend son procès.');
         break;
+      case 'god.cat.name': {
+        const name = c.name.trim().slice(0, 24);
+        if (!name) break;
+        this.world.catName = name;
+        this.emit('village.event', [], `🐈 Le chat de la place a un nom : ${name} !`, { catName: name });
+        this.broadcastPatch({ catName: name });
+        break;
+      }
       case 'god.agent.add':
         addAgent(this, c);
         break;

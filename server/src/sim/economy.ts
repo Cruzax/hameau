@@ -1,4 +1,4 @@
-import type { Agent, AgentId, Good, WorldState, Workplace, WorkplaceKind } from '@hameau/shared';
+import { seasonOf, type Agent, type AgentId, type Good, type Season, type WorldState, type Workplace, type WorkplaceKind } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { newWorkplace } from './god';
 import {
@@ -15,6 +15,9 @@ const SUPPLY: { buyer: WorkplaceKind; good: Good; seller: WorkplaceKind; perWork
   { buyer: 'boulangerie', good: 'bois', seller: 'scierie', perWorker: OUTPUT_PER_WORKER.pain / BREAD_PER_WOOD },
   { buyer: 'forge', good: 'bois', seller: 'scierie', perWorker: OUTPUT_PER_WORKER.outils },
 ];
+
+/** Les récoltes suivent les saisons : maigres l'hiver, généreuses l'été. */
+const HARVEST: Record<Season, number> = { printemps: 1, ete: 1.2, automne: 1.1, hiver: 0.7 };
 
 const invOf = (a: Agent) => (a.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
 
@@ -216,7 +219,7 @@ export class Economy {
       if (output && (st[output] ?? 0) >= cap) continue;
       const add = (g: Good, q: number) => (st[g] = (st[g] ?? 0) + q);
       switch (wp.kind) {
-        case 'ferme': add('ble', OUTPUT_PER_WORKER.ble * n); break;
+        case 'ferme': add('ble', Math.round(OUTPUT_PER_WORKER.ble * n * HARVEST[seasonOf(sim.clock.day)])); break;
         case 'scierie': add('bois', OUTPUT_PER_WORKER.bois * n); break;
         case 'moulin': {
           const q = Math.min(st.ble ?? 0, OUTPUT_PER_WORKER.farine * n);

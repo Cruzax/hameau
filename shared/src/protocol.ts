@@ -30,5 +30,6 @@ export type ClientToServer =
   | { type: 'god.workplace.open'; kind: WorkplaceKind }
   | { type: 'god.love'; a: AgentId; b: AgentId }
   | { type: 'god.accuse'; agentId: AgentId }
+  | { type: 'god.cat.name'; name: string }
   /** Recommence une histoire vierge. */
   | { type: 'god.reset'; preset?: 'complet' | 'origine'; founders?: FounderSpec[] };

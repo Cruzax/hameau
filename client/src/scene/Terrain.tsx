@@ -1,16 +1,26 @@
 import { useMemo } from 'react';
 import { BufferAttribute, Color, PlaneGeometry } from 'three';
-import { distToPolyline, mulberry32, type Terrain as TerrainData } from '@hameau/shared';
+import { distToPolyline, mulberry32, seasonOf, type Season, type Terrain as TerrainData } from '@hameau/shared';
+import { useHameau } from '../net/store';
 import { riverPath, terrainHeight } from './terrainMath';
 
-const GRASS = ['#9cbf5a', '#a7c662', '#93b752'].map((c) => new Color(c));
+/** L'herbe selon la saison : tendre au printemps, dorée en automne, sous la neige l'hiver. */
+const GRASS: Record<Season, Color[]> = {
+  printemps: ['#9cbf5a', '#a7c662', '#93b752'].map((c) => new Color(c)),
+  ete: ['#a9bf4f', '#b4c25a', '#9db548'].map((c) => new Color(c)),
+  automne: ['#b8a84e', '#c2a24a', '#a99a48'].map((c) => new Color(c)),
+  hiver: ['#eef2f5', '#e4eaee', '#f5f7f9'].map((c) => new Color(c)),
+};
 const HILL = new Color('#7f9c4c');
 const HILL_HIGH = new Color('#c9a66b');
 const SAND = new Color('#dcc48f');
 
 /** `onPick` : clic sur le sol (point visé), quand un pouvoir du mode Dieu attend une position. */
 export function Terrain({ terrain, onPick }: { terrain: TerrainData; onPick?: (p: { x: number; z: number }) => void }) {
+  const season = useHameau((s) => seasonOf(s.world.clock.day));
   const geometry = useMemo(() => {
+    const grass = GRASS[season];
+    const winter = season === 'hiver';
     const seg = 120;
     const plane = new PlaneGeometry(terrain.size, terrain.size, seg, seg);
     plane.rotateX(-Math.PI / 2);
@@ -33,15 +43,15 @@ export function Terrain({ terrain, onPick }: { terrain: TerrainData; onPick?: (p
       const cz = (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3;
       const rd = distToPolyline({ x: cx, z: cz }, river);
       if (rd < halfW + 1.1) c.copy(SAND);
-      else if (cy > 3.2) c.copy(HILL_HIGH);
-      else if (cy > 0.6) c.copy(HILL).lerp(HILL_HIGH, Math.min((cy - 0.6) / 3, 1) * 0.5);
-      else c.copy(GRASS[Math.floor(rand() * GRASS.length)]);
+      else if (cy > 3.2) c.copy(winter ? grass[2] : HILL_HIGH);
+      else if (cy > 0.6) c.copy(winter ? grass[1] : HILL).lerp(winter ? grass[0] : HILL_HIGH, Math.min((cy - 0.6) / 3, 1) * 0.5);
+      else c.copy(grass[Math.floor(rand() * grass.length)]);
       for (let k = 0; k < 3; k++) c.toArray(colors, (f + k) * 3);
     }
     geo.setAttribute('color', new BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     return geo;
-  }, [terrain]);
+  }, [terrain, season]);
 
   return (
     <mesh

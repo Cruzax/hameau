@@ -253,7 +253,7 @@ function Garden({ dims, side }: { dims: Dims; side: number }) {
 }
 
 /** Détails propres à chaque métier ; tous en primitives, remplaçables par un .glb. */
-function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
+function Extras({ style, dims, working }: { style: HouseStyle; dims: Dims; working: boolean }) {
   const top = dims.h + 0.2 + dims.roof;
   switch (style) {
     case 'mairie':
@@ -414,14 +414,14 @@ function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
         </>
       );
     case 'moulin':
-      return <MillSails dims={dims} />;
+      return <MillSails dims={dims} working={working} />;
     case 'scierie':
       return (
         <>
           {/* Tas de rondins et planches sciées */}
           {[0, 1, 2].map((i) =>
-            [0, 1, 2 - i].map((j) => (
-              <mesh key={`${i}:${j}`} position={[dims.w / 2 + 1.0, 0.2 + i * 0.36, -0.7 + j * 0.42 + i * 0.2]} rotation={[0, 0, Math.PI / 2]} castShadow>
+            [0, 1, 2 - i].map((j, k) => (
+              <mesh key={`${i}:${k}`} position={[dims.w / 2 + 1.0, 0.2 + i * 0.36, -0.7 + j * 0.42 + i * 0.2]} rotation={[0, 0, Math.PI / 2]} castShadow>
                 <cylinderGeometry args={[0.18, 0.18, 1.8, 6]} />
                 <meshStandardMaterial color="#8a5f3c" flatShading />
               </mesh>
@@ -430,11 +430,8 @@ function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
           {[0, 1, 2, 3].map((i) => (
             <Box key={i} args={[1.8, 0.08, 0.35]} position={[-dims.w / 2 - 1.1, 0.06 + i * 0.09, 0.4]} color="#c8a070" />
           ))}
-          {/* Grande lame circulaire sous l'auvent */}
-          <mesh position={[0, 1.1, dims.d / 2 + 0.5]} rotation={[0, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.55, 0.55, 0.05, 14]} />
-            <meshStandardMaterial color="#9aa0a8" metalness={0.4} roughness={0.4} />
-          </mesh>
+          {/* Grande lame circulaire sous l'auvent : elle tourne quand on travaille */}
+          <SawBlade position={[0, 1.1, dims.d / 2 + 0.5]} working={working} />
           <Box args={[dims.w + 0.6, 0.1, 1.4]} position={[0, dims.h + 0.25, dims.d / 2 + 0.6]} color={WOOD} />
         </>
       );
@@ -443,11 +440,97 @@ function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
   }
 }
 
-/** Ailes du moulin : quatre pales qui tournent lentement sur la façade. */
-function MillSails({ dims }: { dims: Dims }) {
+/** Lame de la scierie, qui tourne à pleine vitesse pendant le travail. */
+function SawBlade({ position, working }: { position: [number, number, number]; working: boolean }) {
+  const blade = useRef<Mesh>(null);
+  useFrame((_, dt) => {
+    if (blade.current && working) blade.current.rotation.y += dt * 14;
+  });
+  return (
+    <mesh ref={blade} position={position} castShadow>
+      <cylinderGeometry args={[0.55, 0.55, 0.05, 14]} />
+      <meshStandardMaterial color="#9aa0a8" metalness={0.4} roughness={0.4} />
+    </mesh>
+  );
+}
+
+/** Bouffées (fumée, farine, sciure) qui montent en grossissant et s'effacent, en boucle. */
+function Puffs({ origin, color, count = 5, rise = 2.2, size = 0.28, speed = 0.5 }: {
+  origin: [number, number, number]; color: string; count?: number; rise?: number; size?: number; speed?: number;
+}) {
+  const group = useRef<Group>(null);
+  useFrame(({ clock }) => {
+    group.current?.children.forEach((c, i) => {
+      const p = (clock.elapsedTime * speed + i / count) % 1;
+      c.position.set(Math.sin(p * 6 + i) * 0.25, p * rise, Math.cos(p * 5 + i) * 0.15);
+      c.scale.setScalar(size * (0.6 + p * 1.6));
+      const m = (c as Mesh).material as MeshStandardMaterial;
+      m.opacity = 0.75 * (1 - p) * Math.min(1, p * 8);
+    });
+  });
+  return (
+    <group ref={group} position={origin}>
+      {Array.from({ length: count }, (_, i) => (
+        <mesh key={i}>
+          <icosahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color={color} transparent depthWrite={false} flatShading />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Étincelles de la forge : de petits éclats qui jaillissent en arc et retombent. */
+function Sparks({ origin }: { origin: [number, number, number] }) {
+  const group = useRef<Group>(null);
+  useFrame(({ clock }) => {
+    group.current?.children.forEach((c, i) => {
+      const p = (clock.elapsedTime * 1.8 + i / 8) % 1;
+      const a = i * 2.4;
+      c.position.set(Math.cos(a) * p * 0.9, 0.9 * p - 1.4 * p * p, Math.sin(a) * p * 0.9);
+      c.visible = p < 0.85;
+    });
+  });
+  return (
+    <group ref={group} position={origin}>
+      {Array.from({ length: 8 }, (_, i) => (
+        <mesh key={i}>
+          <boxGeometry args={[0.06, 0.06, 0.06]} />
+          <meshStandardMaterial color="#ffb347" emissive="#ff8a1a" emissiveIntensity={2.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Ce qui montre qu'un lieu de travail tourne : il y a quelqu'un au travail en ce moment. */
+function Activity({ style, dims }: { style: HouseStyle; dims: Dims }) {
+  switch (style) {
+    case 'forge':
+      return (
+        <>
+          <Sparks origin={[0, 0.7, dims.d / 2 + 0.9]} />
+          <Puffs origin={[0, dims.h + dims.roof + 0.4, -0.3]} color="#5d5a57" count={4} speed={0.45} />
+        </>
+      );
+    case 'boulangerie':
+      return <Puffs origin={[dims.w / 2 + 0.7, 1.0, -0.2]} color="#e8e2d8" count={6} rise={2.6} speed={0.4} />;
+    case 'moulin':
+      return <Puffs origin={[0, 0.4, dims.d / 2 + 0.6]} color="#f6f1e4" count={4} rise={0.9} size={0.16} speed={0.7} />;
+    case 'scierie':
+      return <Puffs origin={[0, 1.1, dims.d / 2 + 0.5]} color="#d9b98a" count={5} rise={1.0} size={0.12} speed={0.9} />;
+    case 'ferme':
+      return <Puffs origin={[dims.w / 2 + 0.8, 0.9, 0]} color="#e6cf7a" count={4} rise={0.8} size={0.1} speed={0.6} />;
+    default:
+      return null;
+  }
+}
+
+/** Ailes du moulin : quatre pales qui tournent sur la façade, vite quand le meunier est là. */
+function MillSails({ dims, working }: { dims: Dims; working: boolean }) {
   const hub = useRef<Group>(null);
   useFrame((_, dt) => {
-    if (hub.current) hub.current.rotation.z += dt * 0.6;
+    if (hub.current) hub.current.rotation.z += dt * (working ? 2 : 0.35);
   });
   return (
     <group position={[0, dims.h + 0.4, dims.d / 2 + 0.35]}>
@@ -481,7 +564,11 @@ export function openHouseSheet(id: string) {
 const BUILD_SECONDS = 1.6;
 const LOAD_GRACE_MS = 4000;
 
-export function House({ house, owner, isMayor, workplace }: { house: HouseData; owner?: Agent; isMayor: boolean; workplace?: { label: string; boss?: string } }) {
+export function House({ house, owner, isMayor, workplace, working = false }: {
+  house: HouseData; owner?: Agent; isMayor: boolean; workplace?: { label: string; boss?: string };
+  /** Quelqu'un y travaille en ce moment (lieu de travail) : fumée, étincelles, ailes qui tournent… */
+  working?: boolean;
+}) {
   const dims = DIMS[house.style];
   const root = useRef<Group>(null);
   const born = useRef(performance.now());
@@ -579,7 +666,8 @@ export function House({ house, owner, isMayor, workplace }: { house: HouseData; 
       {chimney && <Chimney dims={dims} x={chimney.x} smoke={chimney.smoke} dark={house.style === 'forge'} />}
       {house.style !== 'tour' && <Lantern x={-0.75} z={dims.d / 2 + 0.45} />}
       {GARDEN.includes(house.style) && <Garden dims={dims} side={-1} />}
-      <Extras style={house.style} dims={dims} />
+      <Extras style={house.style} dims={dims} working={working} />
+      {working && <Activity style={house.style} dims={dims} />}
 
       {owner && (
         <Html position={[0, labelY, 0]} center zIndexRange={[10, 0]}>
