@@ -22,11 +22,11 @@ export function CameraDirector() {
   const desired = useRef(new Vector3());
 
   useFrame((_, dt) => {
-    const { shot, focusHouse, capture } = useUI.getState();
+    const { shot, focusHouse } = useUI.getState();
     if (shot === 'libre' || !controls) return;
     const { world, tickAt } = useHameau.getState();
     const k = 1 - Math.exp(-dt * 2.5); // lissage indépendant du framerate
-    let zoom = capture ? 17 : 22;
+    let zoom = 22;
 
     if (shot === 'survol') {
       angle.current += dt * ORBIT_SPEED;

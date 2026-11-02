@@ -1,7 +1,7 @@
 import { useHameau } from '../net/store';
 import { setReplaySpeed, stopReplay, toggleReplayPause } from '../net/replay';
 
-/** Barre de lecture du replay (hors du cadre en mode capture). */
+/** Barre de lecture du replay. */
 export function ReplayBar() {
   const replay = useHameau((s) => s.replay);
   const mode = useHameau((s) => s.mode);

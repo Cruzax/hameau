@@ -306,67 +306,8 @@ html, body, #root, .app {
 .vote__ballot.is-in { border-style: solid; color: var(--ink); background: #fff; }
 .vote__tally { margin-top: 6px; font-size: 12px; font-weight: 600; }
 
-/* ─── Scène / mode capture ──────────────────────────────────── */
+/* ─── Scène ─────────────────────────────────────────────────── */
 .stage { position: absolute; inset: 0; }
-.app--capture { background: #1f1a16; }
-.app--capture .stage {
-  inset: auto;
-  top: 0;
-  left: 50%;
-  height: 100%;
-  aspect-ratio: 9 / 16;
-  transform: translateX(-50%);
-  overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
-}
-.app--capture .banner { top: 3%; padding: 6px 14px; max-width: 78%; }
-.app--capture .banner__title { font-size: clamp(13px, 2.3vh, 26px); }
-.app--capture .bubble { font-size: clamp(11px, 1.5vh, 18px); max-width: 26vh; }
-
-.captions {
-  position: absolute;
-  left: 6%;
-  right: 6%;
-  bottom: 9%;
-  padding: 1.1vh 1.6vh;
-  background: rgba(30, 22, 15, 0.82);
-  color: #fff8ea;
-  border-radius: 1.4vh;
-  font-family: var(--font-title);
-  font-weight: 600;
-  font-size: clamp(14px, 2.4vh, 30px);
-  line-height: 1.25;
-  text-align: center;
-  animation: caption-in 0.3s ease-out;
-  z-index: 20;
-}
-@keyframes caption-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-.capturebar {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  width: 210px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  background: var(--paper);
-  border-radius: 12px;
-  font-size: 12px;
-  z-index: 30;
-}
-.capturebar button, .capturebar select {
-  padding: 5px 8px;
-  border: 1px solid var(--paper-edge);
-  border-radius: 8px;
-  background: #fff;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.capturebar button.is-active { background: var(--ink); color: var(--paper); }
-.capturebar__hint { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; }
 
 /* ─── Replay ────────────────────────────────────────────────── */
 .replaybar {

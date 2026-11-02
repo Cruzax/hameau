@@ -398,7 +398,7 @@ function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
             <Box args={[3.2, 0.06, 3.6]} position={[0, 0.03, 0]} color="#8a6a3a" />
             {[-1.1, -0.37, 0.37, 1.1].map((x) =>
               [-1.3, -0.45, 0.45, 1.3].map((z) => (
-                <Box key={`${x}${z}`} args={[0.62, 0.45, 0.7]} position={[x, 0.26, z]} color={(x + z) % 2 === 0 ? '#e0b84a' : '#d4a83c'} />
+                <Box key={`${x}:${z}`} args={[0.62, 0.45, 0.7]} position={[x, 0.26, z]} color={(x + z) % 2 === 0 ? '#e0b84a' : '#d4a83c'} />
               )),
             )}
           </group>
@@ -421,7 +421,7 @@ function Extras({ style, dims }: { style: HouseStyle; dims: Dims }) {
           {/* Tas de rondins et planches sciées */}
           {[0, 1, 2].map((i) =>
             [0, 1, 2 - i].map((j) => (
-              <mesh key={`${i}${j}`} position={[dims.w / 2 + 1.0, 0.2 + i * 0.36, -0.7 + j * 0.42 + i * 0.2]} rotation={[0, 0, Math.PI / 2]} castShadow>
+              <mesh key={`${i}:${j}`} position={[dims.w / 2 + 1.0, 0.2 + i * 0.36, -0.7 + j * 0.42 + i * 0.2]} rotation={[0, 0, Math.PI / 2]} castShadow>
                 <cylinderGeometry args={[0.18, 0.18, 1.8, 6]} />
                 <meshStandardMaterial color="#8a5f3c" flatShading />
               </mesh>

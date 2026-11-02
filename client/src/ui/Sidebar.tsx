@@ -59,10 +59,6 @@ export function Sidebar() {
       })),
     },
     {
-      title: 'Vidéo',
-      items: [{ id: 'capture', icon: '🎬', label: 'Mode capture 9:16', shortcut: 'C', onClick: () => setUI({ capture: true, shot: 'survol' }) }],
-    },
-    {
       title: 'Partie',
       items: [
         { id: 'new-story', icon: '🌱', label: 'Nouvelle histoire', onClick: () => connected && setUI({ starting: true }) },
