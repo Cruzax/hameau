@@ -18,14 +18,16 @@ export const FIRE_AFTER_ABSENCES = 3;
 export const TILL_FLOAT = 40;
 
 /** Production par employé présent et par jour. Le moulin transforme le blé, la boulangerie la farine et le bois. */
-export const OUTPUT_PER_WORKER = { ble: 6, bois: 4, farine: 6, pain: 12, outils: 1 } as const;
-/** Ce que cuire 12 pains consomme : 4 farines et 2 bûches (soit 3 pains par farine, 6 par bûche). */
+export const OUTPUT_PER_WORKER = { ble: 6, bois: 4, farine: 8, pain: 16, outils: 1 } as const;
+/** Une farine fait 3 pains, une bûche en cuit 6. */
 export const BREAD_PER_FLOUR = 3;
 export const BREAD_PER_WOOD = 6;
 /** Prix de vente, en pièces. */
 export const PRICES = { ble: 1, farine: 2, bois: 2, outils: 6, pain: 2 } as const;
 /** Pain du potager, chaque matin, pour un adulte sans emploi. */
 export const SUBSISTENCE_BREAD = 1;
+/** Pain du potager familial pour un enfant. */
+export const CHILD_BREAD = 2;
 /** Pains qu'un habitant achète d'un coup. */
 export const BREAD_PER_PURCHASE = 2;
 /** La boulangerie garde quelques pains en réserve et n'en offre que quelques-uns par jour. */
@@ -37,9 +39,9 @@ export const ESSENTIAL: WorkplaceKind[] = ['boulangerie', 'ferme', 'moulin', 'sc
 /** Poids des métiers quand on ouvre un lieu de plus pour les sans-emploi (plus de fermes que de forges). */
 export const GROWTH_WEIGHT: Partial<Record<WorkplaceKind, number>> = { ferme: 2, boulangerie: 1.5, moulin: 1, scierie: 1, forge: 0.5 };
 /** Pains par habitant et par jour à pouvoir produire (un pain rend 0,6 de satiété ; on en perd 0,9 par jour). */
-export const BREAD_NEED_PER_PERSON = 1.6;
-/** Pains par jour que permet un poste occupé, maillon par maillon (12 cuits, 6 farines × 3, 6 blés × 3, 4 bûches × 6). */
-export const BREAD_PER_SLOT: Partial<Record<WorkplaceKind, number>> = { boulangerie: 12, moulin: 18, ferme: 18, scierie: 24 };
+export const BREAD_NEED_PER_PERSON = 2;
+/** Pains par jour que permet un poste occupé, maillon par maillon (16 cuits, 8 farines × 3, 6 blés × 3, 4 bûches × 6). */
+export const BREAD_PER_SLOT: Partial<Record<WorkplaceKind, number>> = { boulangerie: 16, moulin: 24, ferme: 18, scierie: 24 };
 /** Mise de départ d'un fondateur, qui devient patron. */
 export const FOUNDING_COST = 20;
 /** Soirs d'affilée sans de quoi payer un salaire avant la faillite. */

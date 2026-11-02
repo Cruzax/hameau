@@ -4,7 +4,7 @@ import { newWorkplace } from './god';
 import {
   BAKERY_RESERVE, BREAD_PER_FLOUR, BREAD_PER_PURCHASE, BREAD_PER_WOOD, FIRE_AFTER_ABSENCES, FIRE_AFTER_UNPAID_DAYS, GIFTS_PER_DAY,
   OUTPUT_PER_WORKER, PRICES, SUBSISTENCE_BREAD, SWITCH_IF_BETTER_BY, TILL_FLOAT, WAGES,
-  OUTPUT_GOOD, OWNER_KEEPS, OWNER_REFILL, STOCK_CAP, VILLAGE_TILL_FLOOR,
+  CHILD_BREAD, OUTPUT_GOOD, OWNER_KEEPS, OWNER_REFILL, STOCK_CAP, VILLAGE_TILL_FLOOR,
   BANKRUPT_AFTER_DAYS, BREAD_NEED_PER_PERSON, BREAD_PER_SLOT, ESSENTIAL, FOUNDING_COST, GROWTH_WEIGHT,
 } from './economyConfig';
 
@@ -107,8 +107,8 @@ export class Economy {
       const canLeave = current && current.workers.length > 1;
       if (!current || (canLeave && WAGES[best.kind] >= WAGES[current.kind] + SWITCH_IF_BETTER_BY)) this.hire(sim, a.id, best.id);
     }
-    // Le potager : un pain par jour pour qui n'a pas d'emploi (enfants compris).
-    for (const a of Object.values(w.agents)) if (!a.job) invOf(a).pain += SUBSISTENCE_BREAD;
+    // Le potager : un pain par jour pour qui n'a pas d'emploi, deux pour un enfant (nourri par sa famille).
+    for (const a of Object.values(w.agents)) if (!a.job) invOf(a).pain += isAdult(w, a) ? SUBSISTENCE_BREAD : CHILD_BREAD;
     this.gifts.clear();
     this.present.clear();
     for (const wp of Object.values(w.workplaces)) {

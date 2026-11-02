@@ -26,3 +26,20 @@ test('un honnête ne vole pas, même pauvre', () => {
 test('un malhonnête riche ne vole pas par envie', () => {
   assert.equal(theftUrge(who(0.3), { satiete: 0.8, pain: 2, pieces: 30 }), 0);
 });
+
+import { Justice } from '../sim/justice';
+import { newSim } from './helpers';
+
+test('première condamnation : une amende versée à la victime ; récidive : bannissement', () => {
+  const sim = newSim();
+  const [thief, victim] = Object.values(sim.world.agents);
+  thief.inventory = { pain: 0, bois: 0, outils: 0, pieces: 15 };
+  victim.inventory = { pain: 0, bois: 0, outils: 0, pieces: 0 };
+  const justice = new Justice();
+  assert.equal(justice.punish(sim, thief.id, victim.id), 'amende');
+  assert.ok(sim.world.agents[thief.id], 'banni dès la première fois');
+  assert.equal(thief.inventory.pieces, 5);
+  assert.equal(victim.inventory.pieces, 10);
+  assert.equal(justice.punish(sim, thief.id, victim.id), 'bannissement');
+  assert.equal(sim.world.agents[thief.id], undefined);
+});

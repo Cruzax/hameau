@@ -18,8 +18,34 @@ interface Case {
 const TRIAL_HOUR = 18;
 const VERDICT_HOUR = 19;
 
+/** Amende maximale d'une première condamnation, versée à la victime. */
+const FINE = 10;
+
 export class Justice {
   cases: Case[] = [];
+  /** Condamnations passées, par habitant : la récidive mène au bannissement. */
+  private convictions = new Map<AgentId, number>();
+
+  /** Peine d'un coupable : une amende la première fois, le bannissement en cas de récidive. */
+  punish(sim: Sim, accusedId: AgentId, victimId: AgentId): 'amende' | 'bannissement' {
+    const n = (this.convictions.get(accusedId) ?? 0) + 1;
+    this.convictions.set(accusedId, n);
+    if (n >= 2) {
+      sim.daily.banish(sim, accusedId);
+      return 'bannissement';
+    }
+    const thief = sim.agent(accusedId);
+    const victim = sim.agent(victimId);
+    if (thief && victim) {
+      const t = (thief.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
+      const v = (victim.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
+      const fine = Math.min(FINE, t.pieces);
+      t.pieces -= fine;
+      v.pieces += fine;
+      for (const a of Object.values(sim.world.agents)) if (a.id !== accusedId) sim.adjustOpinion(a.id, accusedId, -0.15);
+    }
+    return 'amende';
+  }
 
   get open() {
     return this.cases.find((c) => c.status !== 'clos');
@@ -115,14 +141,15 @@ export class Justice {
     }
     const condemned = guilty > voters / 2;
     const truth = accused.id === c.culprit;
+    const repeat = (this.convictions.get(accused.id) ?? 0) >= 1;
     sim.emit('trial.verdict', [accused.id, garde ?? accused.id],
       condemned
-        ? `⚖️ Le village déclare ${accused.name} coupable (${guilty}/${voters}) : bannissement !`
+        ? `⚖️ Le village déclare ${accused.name} coupable (${guilty}/${voters}) : ${repeat ? 'récidive, bannissement !' : 'une amende pour dédommager la victime.'}`
         : `⚖️ Le village innocente ${accused.name} (${guilty}/${voters}), qui rentre chez soi la tête haute.`,
-      { caseId: c.id, condemned, truth });
+      { caseId: c.id, condemned, truth, banished: condemned && repeat });
     if (condemned) {
-      if (!truth) for (const a of Object.values(sim.world.agents)) if (a.id === c.culprit) sim.remember(a.id, a.id, 'in', `Ils ont banni ${accused.name} à ma place…`);
-      sim.daily.banish(sim, accused.id);
+      if (!truth) for (const a of Object.values(sim.world.agents)) if (a.id === c.culprit) sim.remember(a.id, a.id, 'in', `Ils ont condamné ${accused.name} à ma place…`);
+      this.punish(sim, accused.id, c.victim);
     } else if (garde) {
       sim.adjustOpinion(accused.id, garde, -0.4, 'Accusation injuste');
     }
