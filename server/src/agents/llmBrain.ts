@@ -12,7 +12,6 @@ const ACT_DELAY = 2;
 /** Probabilité de répondre à un simple bavardage (chaque réponse coûte un appel). */
 const CHAT_REPLY_CHANCE = 0.4;
 /** Appels LLM par habitant et par jour (le plafond ne descend jamais sous LLM_MAX_CALLS_PER_DAY). */
-const CALLS_PER_RESIDENT = 6;
 
 /**
  * Cerveau piloté par un LLMProvider. Un agent se « réveille » sur un déclencheur
@@ -46,6 +45,11 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
     return false;
   }
 
+  /** Seul le villageois choisi à la création pense avec l'IA ; les autres suivent le script (gratuit). */
+  function usesAI(sim: Sim, agentId: AgentId) {
+    return provider.name !== 'mock' && sim.world.aiAgentId === agentId;
+  }
+
   async function call<T>(sim: Sim, agent: Agent, purpose: string, req: LLMRequest<T>): Promise<T | null> {
     const res = await provider.complete(req);
     const b = sim.world.llm.budget;
@@ -65,16 +69,20 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
       return;
     }
     const agent = sim.agent(agentId);
-    if (!agent || !reserve(sim)) return;
+    if (!agent) return;
     busy.add(agentId);
     sim.setActivity(agentId, 'thinking');
     try {
-      const decision = await call(sim, agent, 'décision', {
-        system: systemPrompt(agent, agent.id === sim.world.mayorId),
-        prompt: situationPrompt(sim.world, agent, trigger),
-        schema: DecisionSchema,
-        scripted: () => script.decide(sim.world, agent, trigger),
-      });
+      const scripted = () => script.decide(sim.world, agent, trigger);
+      // Budget épuisé : l'agent IA retombe sur le script plutôt que de se taire.
+      const decision = usesAI(sim, agentId) && reserve(sim)
+        ? await call(sim, agent, 'décision', {
+          system: systemPrompt(agent, agent.id === sim.world.mayorId),
+          prompt: situationPrompt(sim.world, agent, trigger),
+          schema: DecisionSchema,
+          scripted,
+        })
+        : (provider.name === 'mock' && reserve(sim), scripted()); // en gratuit, on compte quand même pour l'affichage
       const actions = decision ? toActions(sim.world, agent, decision) : [{ type: 'think' as const, text: '…' }];
       if (actions.length) sim.plan(agentId, ACT_DELAY, actions);
       else sim.setActivity(agentId, 'idle');
@@ -92,9 +100,8 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
 
     onDayStart(sim) {
       script.newDay();
-      // Plus il y a d'habitants, plus il faut d'appels : le plafond suit la population.
-      const b = sim.world.llm.budget;
-      b.maxCallsPerDay = Math.max(LLM_CONFIG.maxCallsPerDay, CALLS_PER_RESIDENT * Object.keys(sim.world.agents).length);
+      // Un seul villageois pense avec l'IA : le plafond d'appels ne dépend plus de la population.
+      sim.world.llm.budget.maxCallsPerDay = LLM_CONFIG.maxCallsPerDay;
       sim.touchLLM();
     },
 
@@ -122,7 +129,7 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
       for (const agent of Object.values(sim.world.agents)) {
         const scripted = () => script.vote(sim.world, agent, vote);
         const delay = 3 + Math.floor(script.rand() * 30);
-        if (provider.name === 'mock' || !reserve(sim)) {
+        if (!usesAI(sim, agent.id) || !reserve(sim)) {
           sim.plan(agent.id, delay, voteActions(sim.world, agent, scripted()));
           continue;
         }
@@ -145,7 +152,7 @@ export function createLLMBrain(initial: LLMProvider, seed?: number): Brain & { s
         if (!agent.memory.short.some((m) => m.day === sim.clock.day)) continue;
         const fallback = script.summarize(sim.world, agent);
         // Un jour sur deux seulement : le résumé par l'IA coûtait un quart des appels.
-        if (provider.name === 'mock' || sim.clock.day % 2 === 1 || !reserve(sim)) {
+        if (!usesAI(sim, agent.id) || sim.clock.day % 2 === 1 || !reserve(sim)) {
           agent.memory.long = fallback;
           continue;
         }

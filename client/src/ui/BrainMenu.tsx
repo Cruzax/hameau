@@ -32,6 +32,7 @@ function guess(key: string) {
 /** Badge 🧠 + menu : gratuit, une clé API (fournisseur reconnu automatiquement), ou Ollama. */
 export function BrainMenu() {
   const llm = useHameau((s) => s.world.llm);
+  const aiAgent = useHameau((s) => (s.world.aiAgentId ? s.world.agents[s.world.aiAgentId]?.name : undefined));
   const clock = useHameau((s) => s.world.clock);
   const send = useHameau((s) => s.send);
   const connected = useHameau((s) => s.connected);
@@ -70,6 +71,11 @@ export function BrainMenu() {
       {open && (
         <div className="brain__menu">
           <div className="brain__title">Cerveau des agents</div>
+          <span className="brain__small">
+            {aiAgent
+              ? `L’IA choisie ici ne pilote que ${aiAgent} ; tout le reste du village suit les règles gratuites.`
+              : 'Aucun villageois n’est piloté par l’IA : choisis-en un dans « Nouvelle histoire ».'}
+          </span>
 
           <button className={`brain__opt ${llm.provider === 'mock' ? 'is-current' : ''}`} disabled={!connected} onClick={() => activate('mock')}>
             <strong>🆓 Gratuit</strong>
