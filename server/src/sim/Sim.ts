@@ -31,7 +31,7 @@ import { Economy } from './economy';
 import { gazetteStaff, HEADLINE_MIN, pickHeadline, score, SMALL_VILLAGE, SMALL_VILLAGE_MIN, SPECIAL_EDITION } from './newsworthy';
 import { clearNews, pushNews } from '../content/news';
 import { effectsFromText, isActive, startEffect, STORM_SLOWDOWN, tickEffects } from './effects';
-import { addAgent, buildRoad, cutOrReopenRoad, exileAgent, newWorkplace } from './god';
+import { addAgent, buildRoad, cutOrReopenRoad, exileAgent, newWorkplace, sweepEmptyHouses } from './god';
 import { restoreState, stateOf } from './save';
 import { briefsSince, mayorWord, weatherSince } from '../content/gazetteExtras';
 import { checkTreasures, placeTreasure, planWeather, rebuildRuins } from './disasters';
@@ -236,6 +236,7 @@ export class Sim {
     const stifled = this.journal.events.some((e) => e.day === this.clock.day - 1 && score(e) >= 6 && !this.coveredNews.has(e.seq));
     this.politics.onDayEnd(this, { issues, stifled, hungry, paid: this.economy.paidToday });
     rebuildRuins(this);
+    sweepEmptyHouses(this);
     if (this.lifeEnabled) {
       // Le voisinage rapproche : un peu d'estime en plus entre voisins directs, chaque soir.
       for (const a of Object.values(this.world.agents)) for (const n of neighbors(this.world, a.id)) this.adjustOpinion(a.id, n, 0.02);

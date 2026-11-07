@@ -448,8 +448,10 @@ export class Life {
     const id = slug(sim, name);
     const r = this.rand();
     const role: Role = r < 0.12 ? 'MENTEUR' : r < 0.24 ? 'VOLEUR' : 'CITOYEN';
-    const empty = Object.values(w.houses).find((h) => !h.ownerId && !h.ruined && isDwelling(h));
-    const house = empty ?? newHouse(sim, id, homeSite(sim), role);
+    // On bâtit sa propre maison ; une maison vide ne sert que s'il n'y a plus de place pour construire.
+    const built = newHouse(sim, id, homeSite(sim), role);
+    const empty = built ? undefined : Object.values(w.houses).find((h) => !h.ownerId && !h.ruined && isDwelling(h));
+    const house = built ?? empty;
     if (!house) return;
     house.ownerId = id;
     w.houses[house.id] = house;

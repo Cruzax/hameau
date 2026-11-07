@@ -2,6 +2,7 @@ import {
   dist,
   facing,
   isBuildable,
+  isDwelling,
   type Agent,
   type AgentId,
   type ClientToServer,
@@ -95,6 +96,47 @@ export function slug(sim: Sim, name: string) {
   let id = base;
   for (let i = 2; sim.world.agents[id] || sim.world.houses[`h-${id}`]; i++) id = `${base}-${i}`;
   return id;
+}
+
+/**
+ * Une maison que plus personne n'habite est démontée : l'herbe repousse et le prochain arrivant bâtira ailleurs.
+ * Une maison par où passent d'autres routes devient un simple carrefour, pour ne couper personne du village.
+ * Rend false si un messager est en route sur l'un de ses chemins (on réessaiera plus tard).
+ */
+export function demolishHouse(sim: Sim, id: HouseId): boolean {
+  const w = sim.world;
+  const h = w.houses[id];
+  if (!h) return false;
+  const roads = Object.values(w.roads).filter((r) => r.a === id || r.b === id);
+  if (Object.values(w.messages).some((m) => m.route.some((r) => roads.some((x) => x.id === r)))) return false;
+  // Ceux qui étaient en visite rentrent chez eux.
+  for (const a of Object.values(w.agents)) {
+    const l = a.location;
+    if ((l?.kind === 'at' && l.place === id) || (l?.kind === 'walking' && l.to === id)) a.location = { kind: 'home' };
+  }
+  if (roads.length <= 1) {
+    for (const r of roads) delete w.roads[r.id];
+    delete w.houses[id];
+  } else {
+    Object.assign(h, { kind: 'carrefour', ownerId: null, style: 'carrefour' });
+    delete h.ruined;
+  }
+  sim.broadcastPatch({ houses: w.houses, roads: w.roads });
+  return true;
+}
+
+/** Le soir : on démonte les maisons restées vides (départ, décès, bannissement). */
+export function sweepEmptyHouses(sim: Sim) {
+  const w = sim.world;
+  let taken = 0;
+  for (const h of Object.values(w.houses)) {
+    if (!isDwelling(h) || h.ownerId || h.style === 'mairie' || h.id.startsWith('place-') || h.id.startsWith('pont-')) continue;
+    if (Object.values(w.agents).some((a) => a.houseId === h.id || a.lodging === h.id)) continue;
+    if (demolishHouse(sim, h.id)) taken++;
+  }
+  if (taken) sim.emit('house.built', [], taken > 1
+    ? `🏚 ${taken} maisons vides sont démontées : l’herbe repousse, d’autres bâtiront ailleurs.`
+    : '🏚 Une maison vide est démontée : l’herbe repousse, d’autres bâtiront ailleurs.', { demolished: taken });
 }
 
 /** Maison neuve pour `ownerId` près de `near` (pas encore ajoutée au monde), ou null faute de place. */

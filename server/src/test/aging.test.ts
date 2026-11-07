@@ -56,3 +56,15 @@ test('la rancune s’efface avec le temps', () => {
   for (let i = 0; i < 200 && (a.opinions[b.id] ?? 0) < -0.3; i++) (sim.life as unknown as { healGrudges(s: unknown): void }).healGrudges(sim);
   assert.ok(a.opinions[b.id] >= -0.3);
 });
+
+test('une maison restée vide est démontée ; un arrivant bâtit sa propre maison', async () => {
+  const { sweepEmptyHouses } = await import('../sim/god');
+  const sim = village();
+  const melissa = byName(sim, 'Melissa');
+  const house = melissa.houseId;
+  sim.life.die(sim, melissa);
+  sweepEmptyHouses(sim);
+  const h = sim.world.houses[house];
+  assert.ok(!h || h.kind === 'carrefour', 'la maison vide est toujours là');
+  assert.ok(Object.values(sim.world.agents).every((a) => sim.world.houses[a.houseId]), 'quelqu’un a perdu sa maison');
+});
