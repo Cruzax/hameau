@@ -28,6 +28,51 @@ export interface TalkContext {
   headline?: string;
   /** Prénom du ou de la partenaire de celui qui parle. */
   partner?: string;
+  // ─── Ce qui se passe au village ces jours-ci (tout est facultatif) ───
+  season?: 'printemps' | 'ete' | 'automne' | 'hiver';
+  /** Un proche qui vient de s'éteindre. */
+  grief?: string;
+  /** Un proche parti du village. */
+  missed?: string;
+  /** Quelqu'un parti voir le monde. */
+  wanderer?: string;
+  /** « A et B », mariés ces jours-ci. */
+  wedding?: string;
+  /** Le bébé baptisé ces jours-ci. */
+  baptism?: string;
+  /** Des obsèques ont lieu sur la place. */
+  funeral?: boolean;
+  /** Celui qui parle est hébergé chez quelqu'un (maison détruite). */
+  lodgingWith?: string;
+  /** Celui qui parle héberge des sinistrés. */
+  hosting?: string;
+  /** Ceux dont la tornade a emporté la maison. */
+  tornadoVictims?: string;
+  /** Le plus riche du village, quand celui qui parle est du genre jaloux. */
+  envyOf?: string;
+  /** Qui a trouvé un trésor (pas celui qui parle). */
+  treasureFinder?: string;
+  /** Celui qui parle a trouvé un trésor. */
+  foundTreasure?: boolean;
+  /** Le coup dur survenu là où travaille celui qui parle. */
+  mishap?: string;
+  /** Celui qui parle a perdu son travail dans une faillite. */
+  closedDown?: boolean;
+  /** Les deux viennent de se réconcilier. */
+  reconciled?: boolean;
+  /** Le nouveau maire (élu ces jours-ci). */
+  newMayor?: string;
+  /** Celui qui parle vient d'être élu. */
+  justElected?: boolean;
+  elder?: boolean;
+  child?: boolean;
+  /** L'impôt du village vient d'aider les plus pauvres, dont celui qui parle. */
+  taxHelped?: boolean;
+  /** Celui qui parle vient d'être recueilli. */
+  adopted?: boolean;
+  catName?: string;
+  /** Le maître du chien (le maire). */
+  dogOwner?: string;
 }
 
 /** Une réplique et, parfois, la réponse de l'autre. */
@@ -301,6 +346,120 @@ const SITUATIONS: { when: (c: TalkContext) => boolean; lines: (c: TalkContext) =
   { when: (c) => c.dayName === 'dimanche', lines: () => ['Ah, le dimanche… rien à faire, le bonheur.', 'On pique-nique sur la place, tu viens ?', 'Grasse matinée, enfin.'] },
   { when: (c) => c.dayName === 'mercredi', lines: () => ['Tu vas au marché ?', 'Il paraît qu’un colporteur passe aujourd’hui.'] },
   { when: (c) => c.dayName === 'lundi', lines: () => ['Lundi… déjà.', 'Allez, une nouvelle semaine.'] },
+  // ─── Le temps qui passe : saisons ───
+  { when: (c) => c.season === 'hiver' && Math.random() < 0.5, lines: () => [
+    'Il neige encore… j’ai plus de pieds.', 'Rentre vite, on gèle dehors.', 'Les blés dorment sous la neige, faudra serrer la ceinture.',
+    'J’ai fait un bonhomme de neige derrière la maison.', 'Le bois part vite, cet hiver.', 'Vivement le printemps, sérieux.',
+    'T’as vu le givre sur la fontaine ?', 'Une soupe bien chaude et au lit, voilà mon programme.',
+  ] },
+  { when: (c) => c.season === 'printemps' && Math.random() < 0.4, lines: () => [
+    'Ça sent bon les fleurs, ce matin.', 'Les cerisiers sont en fleurs, t’as vu ?', 'Le printemps, ça donne envie de tout repeindre.',
+    'Les oiseaux sont revenus, ça chante de partout.', 'On va pouvoir ressemer, enfin.', 'J’ai sorti les chaises dehors, il fait trop bon.',
+  ] },
+  { when: (c) => c.season === 'ete' && Math.random() < 0.4, lines: () => [
+    'Quelle chaleur ! Je fonds.', 'Les blés sont hauts, belle récolte en vue.', 'On va se baigner à la rivière ce soir ?',
+    'Il fait trop chaud pour travailler, franchement.', 'Gare aux orages, ça couve.', 'Les fruits sont bien mûrs cette année.',
+  ] },
+  { when: (c) => c.season === 'automne' && Math.random() < 0.4, lines: () => [
+    'Les feuilles tombent de partout.', 'Ça sent la pluie, rentre ton linge.', 'Les champignons sont sortis dans la forêt.',
+    'Faut faire des réserves avant l’hiver.', 'J’aime bien l’automne, c’est tout doré.', 'Le vent se lève, ça va souffler cette nuit.',
+  ] },
+  // ─── Deuils, départs ───
+  { when: (c) => !!c.grief, lines: (c) => [
+    `${c.grief} me manque déjà.`, `Je pense à ${c.grief}, tout le temps.`, `${c.grief} avait toujours un mot gentil pour moi.`,
+    `Sans ${c.grief}, le village est plus vide.`, `On a tellement ri avec ${c.grief}…`, `J’ai gardé un souvenir de ${c.grief}, je le regarde le soir.`,
+  ] },
+  { when: (c) => !!c.funeral, lines: () => [
+    'Belle cérémonie, malgré tout.', 'Tout le village était là, ça fait chaud au cœur.', 'On se serre les coudes, c’est ce qui compte.',
+    'J’ai jamais su quoi dire, aux obsèques.', 'Une vie bien remplie, quand même.',
+  ] },
+  { when: (c) => !!c.missed, lines: (c) => [
+    `Depuis le départ de ${c.missed}, c’est plus pareil.`, `T’as des nouvelles de ${c.missed} ?`, `J’espère que ${c.missed} va bien, là-bas.`,
+    `La maison de ${c.missed} a déjà disparu… ça va vite.`,
+  ] },
+  { when: (c) => !!c.wanderer, lines: (c) => [
+    `${c.wanderer} a pris la route pour voir le monde, quelle chance.`, `Un jour, je partirai aussi, comme ${c.wanderer}.`, `Paraît que ${c.wanderer} voulait voir la mer.`,
+  ] },
+  // ─── Grands moments ───
+  { when: (c) => !!c.wedding, lines: (c) => [
+    `Le mariage de ${c.wedding}, quelle fête !`, `${c.wedding}, ça va durer, ces deux-là.`, `J’ai pleuré au mariage de ${c.wedding}, chut.`,
+    `T’as vu les guirlandes pour ${c.wedding} ? Magnifiques.`, 'À quand le prochain mariage, hein ?',
+  ] },
+  { when: (c) => !!c.baptism, lines: (c) => [
+    `T’as vu le bébé, ${c.baptism} ? Trop mignon.`, `Le baptême de ${c.baptism}, c’était touchant.`, `Bienvenue à ${c.baptism} au village !`,
+    `${c.baptism} a hurlé pendant toute la cérémonie, mdr.`,
+  ] },
+  // ─── Tornade ───
+  { when: (c) => !!c.lodgingWith, lines: (c) => [
+    `Je dors chez ${c.lodgingWith} en attendant, c’est gentil.`, 'Ma maison… il reste plus rien.', 'Les voisins vont m’aider à rebâtir, ça me touche.',
+    'Trois jours de chantier, qu’ils disent.', `${c.lodgingWith} ronfle, mais je dis rien.`,
+  ] },
+  { when: (c) => !!c.hosting, lines: (c) => [
+    `J’héberge ${c.hosting} le temps que la maison soit rebâtie.`, 'On se serre un peu à la maison, mais ça va.', 'Entre voisins, on s’aide, c’est normal.',
+  ] },
+  { when: (c) => !!c.tornadoVictims, lines: (c) => [
+    `La tornade a tout emporté chez ${c.tornadoVictims}.`, `On va donner un coup de main à ${c.tornadoVictims} pour rebâtir.`, 'J’ai jamais vu un vent pareil.',
+    'J’ai cru que mon toit allait s’envoler aussi.',
+  ] },
+  // ─── Argent, chance, malchance ───
+  { when: (c) => !!c.envyOf, lines: (c) => [
+    `${c.envyOf} roule sur l’or, et nous on compte nos sous.`, `T’as vu la bourse de ${c.envyOf} ? Ça me dégoûte.`, `Un jour, ${c.envyOf} va bien finir par partager.`,
+    `${c.envyOf} nous regarde de haut, maintenant.`, `J’aimerais avoir la fortune de ${c.envyOf}, rien qu’une semaine.`,
+  ] },
+  { when: (c) => !!c.treasureFinder, lines: (c) => [
+    `${c.treasureFinder} a trouvé un trésor ! La chance…`, `Paraît que ${c.treasureFinder} a touché le gros lot.`, `Je vais fouiller l’herbe tous les jours, moi, comme ${c.treasureFinder}.`,
+    `${c.treasureFinder} va nous payer une tournée, j’espère.`,
+  ] },
+  { when: (c) => !!c.foundTreasure, lines: () => [
+    'Un coffre plein de pièces, j’en reviens toujours pas !', 'Je vais m’acheter… je sais même pas quoi.', 'Chut, parle pas trop fort de mon trésor.',
+    'Tout le monde me regarde bizarrement depuis le trésor.',
+  ] },
+  { when: (c) => !!c.mishap, lines: (c) => [
+    `T’as su ? ${c.mishap}.`, 'Au boulot, c’est la catastrophe en ce moment.', 'Le patron fait une tête d’enterrement depuis le coup dur.',
+    'J’espère qu’on va pas tous perdre notre place.',
+  ] },
+  { when: (c) => !!c.closedDown, lines: () => [
+    'La boutique a fermé, et mon travail avec.', 'Faillite… du jour au lendemain, plus rien.', 'Faut que je retrouve du travail, vite.',
+    'Si ça continue, je vais devoir partir du village.',
+  ] },
+  { when: (c) => !!c.taxHelped, lines: () => [
+    'Sans l’aide du village, j’aurais pas tenu.', 'L’impôt des riches m’a sauvé la semaine.', 'Quelques pièces, mais ça change tout.',
+  ] },
+  // ─── Liens ───
+  { when: (c) => !!c.reconciled, lines: () => [
+    'On repart sur de bonnes bases ?', 'Ça fait du bien de se reparler.', 'On s’est assez fait la tête, hein.',
+    'Tu m’avais manqué, en vrai.', 'On oublie tout et on trinque ?',
+  ] },
+  { when: (c) => !!c.adopted, lines: () => [
+    'J’ai une nouvelle maison, et je m’y plais.', 'Ma nouvelle famille est super gentille.', 'Ils sont gentils avec moi.',
+  ] },
+  // ─── Politique ───
+  { when: (c) => !!c.newMayor, lines: (c) => [
+    `${c.newMayor} maire… on verra bien ce que ça donne.`, `J’ai voté pour ${c.newMayor}, moi.`, `${c.newMayor} a intérêt à tenir ses promesses.`,
+    `À peine en place, ${c.newMayor} veut déjà tout changer.`,
+  ] },
+  { when: (c) => !!c.justElected, lines: () => [
+    'Merci pour ton vote, je compte sur toi.', 'Maire… je réalise pas encore.', 'Ma porte est ouverte, viens me voir quand tu veux.',
+  ] },
+  // ─── Âges ───
+  { when: (c) => !!c.elder, lines: () => [
+    'De mon temps, il y avait qu’une ferme et trois maisons.', 'J’ai vu ce village grandir, tu sais.', 'Mes genoux, mes genoux…',
+    'Profite, ça passe tellement vite.', 'Le premier hiver, on mangeait des racines, je te jure.',
+    'Les jeunes, ça sait plus rien faire de ses mains.', 'J’ai plus l’âge de courir après les poules.',
+  ] },
+  { when: (c) => !!c.child, lines: () => [
+    'Tu joues avec moi ?', 'Plus tard, moi, je serai maire !', 'J’ai vu un écureuil, il était énorme !',
+    'Pourquoi la rivière elle coule toujours dans le même sens ?', 'J’ai pas sommeil, moi.',
+  ] },
+  // ─── Les bêtes ───
+  { when: (c) => !!c.catName && c.place === 'la place' && Math.random() < 0.3, lines: (c) => [
+    `${c.catName} dort encore sur la margelle du puits.`, `T’as vu ${c.catName} ? Ce chat me suit partout.`, `${c.catName} a volé un poisson au marché, mdr.`,
+  ] },
+  { when: (c) => !c.catName && c.place === 'la place' && Math.random() < 0.15, lines: () => ['Ce chat sur la place, faudrait lui trouver un nom.', 'Le chat de la place me regarde toujours bizarrement.'] },
+  { when: (c) => !!c.dogOwner && Math.random() < 0.1, lines: (c) => [
+    `Le chien de ${c.dogOwner} suit son maître comme son ombre.`, `Le chien de ${c.dogOwner} a encore aboyé toute la nuit.`, 'Les poules de la ferme se sont encore échappées.',
+  ] },
+
   { when: (c) => c.place === 'la place', lines: () => ['La fontaine chante, aujourd’hui.', 'On se croirait un jour de fête.', 'Y a du monde, sur la place.'] },
   { when: (c) => c.place === 'l’auberge', lines: () => ['À la tienne !', 'Encore une, et je rentre.', 'Ce ragoût, une merveille.', 'Qui paie la tournée ?'] },
   { when: (c) => c.mayorOpinion < -0.2, lines: (c) => [`${c.mayorName} nous mène droit dans le mur.`, 'Au prochain conseil, je vote contre.', 'On paie l’impôt pour quoi, au juste ?', `${c.mayorName}, faut que ça change.`] },
@@ -402,13 +561,21 @@ function pickFresh(lines: string[]): string {
   return line;
 }
 
+/** Quand on est fâchés pour de bon : on se boude, de bien des façons. */
+const COLD_SHOULDER = [
+  'Toi, je ne te parle pas.', 'Passe ton chemin.', 'Tiens, revoilà qui je voulais pas voir.', 'J’ai rien à te dire.',
+  'Va voir ailleurs si j’y suis.', 'Hmpf.', 'Fais comme si on se connaissait pas.', 'Encore toi ?',
+  'Je t’ai pas pardonné, tu sais.', 'Pas aujourd’hui. Ni demain.', 'Tu crois que j’ai oublié ?', 'On se reparlera quand tu t’excuseras.',
+];
+export const coldShoulder = () => pickFresh(COLD_SHOULDER);
+
 /** Ce qu'un habitant dit à un autre, en tenant compte de tout le contexte. */
 export function chooseExchange(c: TalkContext): Exchange {
   if (c.mutual < -0.4) {
     const [line, reply] = pick(HOSTILE);
     return { line, reply, bond: -0.05, mood: 'hostile' };
   }
-  if (kin(c.speaker, c.listener) && Math.random() < 0.5) {
+  if (kin(c.speaker, c.listener) && Math.random() < 0.3) {
     const [line, reply] = pick(KIN);
     return { line, reply, bond: 0.04, mood: 'kin' };
   }

@@ -84,3 +84,16 @@ test('des enfants restés seuls sont recueillis ; leur maison vide disparaît', 
   const h = sim.world.houses[house];
   assert.ok(!h || h.kind === 'carrefour');
 });
+
+test('un carrefour qui ne mène plus nulle part disparaît avec sa route', async () => {
+  const { pruneDeadEnds } = await import('../sim/god');
+  const sim = village();
+  const w = sim.world;
+  const anchor = Object.values(w.houses).find((h) => h.id.startsWith('place-'))!;
+  w.houses.bout = { id: 'bout', ownerId: null, kind: 'carrefour', position: { x: anchor.position.x + 5, z: anchor.position.z }, rotation: 0, style: 'carrefour', wallColor: '', roofColor: '' };
+  w.roads.stub = { id: 'stub', a: anchor.id, b: 'bout', waypoints: [], status: 'open' };
+  pruneDeadEnds(sim);
+  assert.equal(w.houses.bout, undefined);
+  assert.equal(w.roads.stub, undefined);
+  assert.ok(w.houses[anchor.id], 'la place ne disparaît pas');
+});

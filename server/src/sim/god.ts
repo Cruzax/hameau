@@ -126,6 +126,28 @@ export function demolishHouse(sim: Sim, id: HouseId): boolean {
   return true;
 }
 
+/**
+ * Les bouts de route qui ne mènent plus nulle part (vers un ancien emplacement de maison devenu carrefour)
+ * sont effacés, de proche en proche. La place et les ponts restent.
+ */
+export function pruneDeadEnds(sim: Sim) {
+  const w = sim.world;
+  let removed = true;
+  while (removed) {
+    removed = false;
+    for (const h of Object.values(w.houses)) {
+      if (h.kind !== 'carrefour' || h.id.startsWith('place-') || h.id.startsWith('pont-')) continue;
+      const roads = Object.values(w.roads).filter((r) => r.a === h.id || r.b === h.id);
+      if (roads.length > 1) continue;
+      if (Object.values(w.messages).some((m) => m.route.some((r) => roads.some((x) => x.id === r)))) continue;
+      for (const r of roads) delete w.roads[r.id];
+      delete w.houses[h.id];
+      removed = true;
+    }
+  }
+  sim.broadcastPatch({ houses: w.houses, roads: w.roads });
+}
+
 /** Le soir : on démonte les maisons restées vides (départ, décès, bannissement). */
 export function sweepEmptyHouses(sim: Sim) {
   const w = sim.world;
@@ -164,6 +186,7 @@ export function sweepEmptyHouses(sim: Sim) {
     if (Object.values(w.agents).some((a) => a.houseId === h.id || a.lodging === h.id)) continue;
     if (demolishHouse(sim, h.id)) taken++;
   }
+  pruneDeadEnds(sim);
   if (taken) sim.emit('house.built', [], taken > 1
     ? `🏚 ${taken} maisons vides sont démontées : l’herbe repousse, d’autres bâtiront ailleurs.`
     : '🏚 Une maison vide est démontée : l’herbe repousse, d’autres bâtiront ailleurs.', { demolished: taken });

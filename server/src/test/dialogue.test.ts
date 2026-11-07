@@ -86,3 +86,9 @@ test('deux habitants à la suite ne répètent pas la même phrase sur la gazett
   }
   assert.equal(new Set(said).size, said.length, said.join(' | '));
 });
+
+test('on parle de ce qui arrive au village : un deuil, l’hiver, un mariage', () => {
+  assert.ok(sample(ctx({ grief: 'Rose' })).some((l) => /Rose/.test(l)));
+  assert.ok(sample(ctx({ season: 'hiver' })).some((l) => /neige|gèle|givre|hiver/.test(l)));
+  assert.ok(sample(ctx({ wedding: 'Lina et Hugo' })).some((l) => /Lina et Hugo/.test(l)));
+});

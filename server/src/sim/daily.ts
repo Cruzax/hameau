@@ -11,6 +11,8 @@ import {
   type TripPurpose,
   type EffectKind,
   type PartyKind,
+  isElder,
+  seasonOf,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { isAdult, placeName as workplaceName } from './economy';
@@ -21,7 +23,7 @@ import { isActive } from './effects';
 import { findPath } from './paths';
 import { createRumor, hottestRumor, rumorToShare, SLANDERS, tellRumor } from './rumors';
 import { Justice } from './justice';
-import { chooseExchange, MUSINGS } from '../content/dialogue';
+import { chooseExchange, coldShoulder, MUSINGS } from '../content/dialogue';
 import { CALENDAR, dayName, EVENTS, helpers, type VillageEvent } from '../content/events';
 import { CRIER_EXTRAS, SONGS } from '../content/verses';
 
@@ -76,19 +78,93 @@ export function wantsBread(n: { satiete: number }, inv: { pain: number; pieces: 
   return (inv.pain < BREAD_RESERVE && inv.pieces >= PRICES.pain) || broke;
 }
 
-/** Ce qui arrive vraiment à celui qui parle : son travail, celui de l'autre, la dernière gazette, son couple. */
+/** Ce qui s'est passé ces trois derniers jours, relu une fois par tick (le journal peut être très long). */
+interface RecentNews {
+  deaths: { name: string; sad: AgentId[] }[];
+  departures: { name: string; sad: AgentId[]; wander: boolean }[];
+  weddings: string[];
+  baptisms: string[];
+  tornado: { victims: AgentId[]; names: string }[];
+  treasure: { finder: AgentId; name: string }[];
+  mishaps: { owner: AgentId; text: string }[];
+  closedJobs: AgentId[];
+  reconciled: [AgentId, AgentId][];
+  newMayor?: AgentId;
+  taxHelp: boolean;
+  adopted: AgentId[];
+}
+let newsCache: { tick: number; news: RecentNews } | null = null;
+
+function recentNews(sim: Sim): RecentNews {
+  if (newsCache?.tick === sim.clock.tick) return newsCache.news;
+  const news: RecentNews = { deaths: [], departures: [], weddings: [], baptisms: [], tornado: [], treasure: [], mishaps: [], closedJobs: [], reconciled: [], taxHelp: false, adopted: [] };
+  const events = sim.journal.events;
+  const day = sim.clock.day;
+  const name = (id?: AgentId) => (id && sim.world.agents[id]?.name) || '';
+  for (let i = events.length - 1; i >= 0 && events[i].day >= day - 3; i--) {
+    const e = events[i];
+    const p = (e.payload ?? {}) as Record<string, unknown>;
+    const first = e.text.replace(/^[^\p{L}]+/u, '').split(/[ ,]/)[0];
+    if (e.type === 'agent.died') news.deaths.push({ name: first, sad: (p.sad as AgentId[]) ?? [] });
+    else if (e.type === 'agent.left') news.departures.push({ name: e.text.match(/: ([^ ]+) (part|partent)|🎒 ([^ ]+)/)?.slice(1).find(Boolean) ?? first, sad: (p.sad as AgentId[]) ?? [], wander: !!p.wander });
+    else if (e.type === 'party' && p.kind === 'mariage' && e.actors.length === 2) news.weddings.push(`${name(e.actors[0])} et ${name(e.actors[1])}`);
+    else if (e.type === 'party' && p.kind === 'bapteme' && e.actors[0]) news.baptisms.push(name(e.actors[0]));
+    else if (e.type === 'house.destroyed') news.tornado.push({ victims: e.actors, names: e.actors.map(name).filter(Boolean).join(' et ') });
+    else if (e.type === 'treasure.found' && e.actors[0]) news.treasure.push({ finder: e.actors[0], name: name(e.actors[0]) });
+    else if (e.type === 'village.event' && p.mishap && e.actors[0]) news.mishaps.push({ owner: e.actors[0], text: e.text });
+    else if (e.type === 'job.changed' && p.lost && /ferme ses portes/.test(e.text)) news.closedJobs.push(...e.actors);
+    else if (e.type === 'life.reconcile' && e.actors.length === 2) news.reconciled.push([e.actors[0], e.actors[1]]);
+    else if (e.type === 'mayor.elected' && !p.kept && !news.newMayor && e.day >= day - 2) news.newMayor = e.actors[0];
+    else if (e.type === 'village.event' && p.helped && e.day >= day - 1) news.taxHelp = true;
+    else if (e.type === 'village.event' && p.adopted) news.adopted.push(String(p.adopted));
+  }
+  newsCache = { tick: sim.clock.tick, news };
+  return news;
+}
+
+/** Ce qui arrive vraiment à celui qui parle : son travail, son couple, sa maison, ses proches, la saison… */
 function talkSituation(sim: Sim, speaker: Agent, listener: Agent) {
   const w = sim.world;
   const job = sim.economy.jobOf(w, speaker.id);
   const listenerJob = sim.economy.jobOf(w, listener.id);
   const recent = w.gazettes.at(-1);
   const partner = speaker.family?.partnerId ? w.agents[speaker.family.partnerId]?.name : undefined;
+  const news = recentNews(sim);
+  const nameOf = (id?: AgentId | null) => (id ? w.agents[id]?.name : undefined);
+  const richest = Object.values(w.agents).sort((x, y) => (y.inventory?.pieces ?? 0) - (x.inventory?.pieces ?? 0))[0];
+  const jealous = speaker.personality.honesty < 0.45 || speaker.personality.traits.some((t) => /jaloux|avare|grincheux/.test(t));
+  const guests = Object.values(w.agents).filter((x) => x.lodging === speaker.houseId).map((x) => x.name);
+  const mishap = news.mishaps.find((m) => job && m.owner === job.ownerId);
   return {
     job: job && workplaceName(job),
     listenerJob: listenerJob && workplaceName(listenerJob),
     jobless: !speaker.job && isAdult(w, speaker),
     headline: recent && w.clock.day - recent.day <= 1 ? recent.headline : undefined,
     partner,
+    season: seasonOf(w.clock.day),
+    grief: news.deaths.find((d) => d.sad.includes(speaker.id))?.name,
+    missed: news.departures.find((d) => d.sad.includes(speaker.id))?.name,
+    wanderer: news.departures.find((d) => d.wander)?.name,
+    wedding: news.weddings[0],
+    baptism: news.baptisms[0],
+    funeral: w.festivity?.kind === 'obseques',
+    lodgingWith: speaker.lodging ? nameOf(w.houses[speaker.lodging]?.ownerId) ?? 'des voisins' : undefined,
+    hosting: guests.length ? guests.join(' et ') : undefined,
+    tornadoVictims: news.tornado.find((t) => !t.victims.includes(speaker.id))?.names || undefined,
+    envyOf: jealous && richest && richest.id !== speaker.id && (richest.inventory?.pieces ?? 0) >= 100 ? richest.name : undefined,
+    treasureFinder: news.treasure.find((t) => t.finder !== speaker.id)?.name,
+    foundTreasure: news.treasure.some((t) => t.finder === speaker.id),
+    mishap: mishap?.text.replace(/^[^\p{L}]+/u, '').split(/[:.]/)[0],
+    closedDown: news.closedJobs.includes(speaker.id),
+    reconciled: news.reconciled.some(([a, b]) => (a === speaker.id && b === listener.id) || (b === speaker.id && a === listener.id)),
+    newMayor: news.newMayor && news.newMayor !== speaker.id ? nameOf(news.newMayor) : undefined,
+    justElected: news.newMayor === speaker.id,
+    elder: isElder(speaker, w.clock.day),
+    child: !isAdult(w, speaker),
+    taxHelped: news.taxHelp && (speaker.inventory?.pieces ?? 0) < 10,
+    adopted: news.adopted.includes(speaker.id),
+    catName: w.catName,
+    dogOwner: nameOf(w.mayorId),
   };
 }
 
@@ -633,7 +709,7 @@ export class Daily {
       let line: string;
       let mood: string | undefined;
       if (mutual < -0.4) {
-        line = 'Toi, je ne te parle pas.';
+        line = coldShoulder();
         mood = 'hostile';
         sim.adjustOpinion(speaker.id, listener.id, -0.04);
         sim.adjustOpinion(listener.id, speaker.id, -0.04);
