@@ -32,7 +32,9 @@ import { CRIER_EXTRAS, SONGS } from '../content/verses';
 
 const WALK_SPEED = 0.7;           // unités de monde par tick (un peu plus vite qu'un messager chargé)
 const DECIDE_EVERY = 12;          // chaque habitant réfléchit à son emploi du temps tous les N ticks
-const MEET_EVERY = 14;            // une conversation par lieu fréquenté, tous les N ticks en moyenne
+const MEET_EVERY = 42;            // une conversation par lieu fréquenté, tous les N ticks en moyenne (≈ 26 s à ×1)
+/** Moins de conversations, mais chacune compte d'autant plus : les liens se font au même rythme qu'avant. */
+const BOND_SCALE = 3;
 /** Délai avant la réponse (ticks) : les répliques s'affichent chacune à leur tour. */
 const REPLY_DELAY = 2; // ≈ 1,25 s à ×1
 const NEEDS_PATCH_EVERY = 8;      // fréquence d'envoi des besoins au site
@@ -711,8 +713,8 @@ export class Daily {
       if (mutual < -0.4) {
         line = coldShoulder();
         mood = 'hostile';
-        sim.adjustOpinion(speaker.id, listener.id, -0.04);
-        sim.adjustOpinion(listener.id, speaker.id, -0.04);
+        sim.adjustOpinion(speaker.id, listener.id, -0.04 * BOND_SCALE);
+        sim.adjustOpinion(listener.id, speaker.id, -0.04 * BOND_SCALE);
       } else if (rumor && Math.random() < 0.7) {
         const told = tellRumor(sim, speaker, listener, rumor);
         line = `Tu sais quoi ? Il paraît ${que(told.text)}.`;
@@ -726,8 +728,8 @@ export class Daily {
         });
         line = ex.line;
         mood = ex.mood;
-        sim.adjustOpinion(speaker.id, listener.id, ex.bond);
-        sim.adjustOpinion(listener.id, speaker.id, ex.bond);
+        sim.adjustOpinion(speaker.id, listener.id, ex.bond * BOND_SCALE);
+        sim.adjustOpinion(listener.id, speaker.id, ex.bond * BOND_SCALE);
         if (ex.reply) {
           // La réponse viendra un peu plus tard, quand la première bulle aura été lue.
           this.replies.push({ due: sim.clock.tick + REPLY_DELAY, speaker: listener.id, listener: speaker.id, text: ex.reply, place });

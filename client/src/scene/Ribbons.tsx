@@ -18,7 +18,9 @@ const BASE_Y = 1.7;
 const STEP_Y = 0.8;
 const DRIFT_Y = 0.15; // par seconde
 /** Au-delà, le plus ancien ruban d'un fil disparaît. */
-const MAX_PER_THREAD = 4;
+const MAX_PER_THREAD = 3;
+/** Rubans à l'écran en tout : les plus récents, pour que ça reste lisible. */
+const MAX_ON_SCREEN = 10;
 
 interface Placed { r: Ribbon; at: Vec2 & { y: number }; rank: number }
 
@@ -73,7 +75,7 @@ export function Ribbons() {
   // Les fils : de la plus récente à la plus ancienne, chaque réplique prend le rang suivant dans son fil.
   const threads: { at: Vec2; count: number }[] = [];
   const placed: Placed[] = [];
-  for (const r of [...live].sort((a, b) => b.born - a.born)) {
+  for (const r of [...live].sort((a, b) => b.born - a.born).slice(0, MAX_ON_SCREEN)) {
     const at = anchors.current.get(r.id);
     if (!at) continue;
     const thread = threads.find((t) => dist(t.at, at) < SAME_THREAD) ?? threads[threads.push({ at, count: 0 }) - 1];
