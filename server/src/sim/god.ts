@@ -19,6 +19,7 @@ import {
 } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode } from './network';
+import { isAdult } from './economy';
 import { FOUNDING_COST, SLOTS } from './economyConfig';
 
 // Pouvoirs du panneau « Dieu ». Tout passe par le journal : chaque intervention est rejouable.
@@ -128,6 +129,35 @@ export function demolishHouse(sim: Sim, id: HouseId): boolean {
 /** Le soir : on démonte les maisons restées vides (départ, décès, bannissement). */
 export function sweepEmptyHouses(sim: Sim) {
   const w = sim.world;
+  // Une maison sans propriétaire mais encore habitée : un adulte resté là la reprend ;
+  // des enfants seuls sont recueillis par un proche (famille d'abord, sinon l'adulte qu'ils aiment le plus).
+  let changed = false;
+  for (const h of Object.values(w.houses)) {
+    if (!isDwelling(h) || (h.ownerId && w.agents[h.ownerId])) continue;
+    const occupants = Object.values(w.agents).filter((a) => a.houseId === h.id);
+    if (!occupants.length) continue;
+    const adult = occupants.find((a) => isAdult(w, a));
+    changed = true;
+    if (adult) {
+      h.ownerId = adult.id;
+      continue;
+    }
+    for (const kid of occupants) {
+      const kin = new Set([...(kid.family?.parentIds ?? []), ...Object.values(w.agents).filter((x) => x.family?.parentIds.some((p) => kid.family?.parentIds.includes(p))).map((x) => x.id)]);
+      const host = Object.values(w.agents)
+        .filter((x) => x.houseId !== h.id && isAdult(w, x) && w.houses[x.houseId]?.ownerId === x.id)
+        .sort((x, y) => (kin.has(y.id) ? 2 : 0) + (kid.opinions[y.id] ?? 0) - ((kin.has(x.id) ? 2 : 0) + (kid.opinions[x.id] ?? 0)))[0];
+      if (!host) continue;
+      kid.houseId = host.houseId;
+      kid.location = { kind: 'home' };
+      sim.adjustOpinion(kid.id, host.id, 0.3);
+      sim.emit('village.event', [host.id, kid.id], `🏡 ${host.name} recueille ${kid.name} sous son toit.`, { adopted: kid.id });
+    }
+  }
+  if (changed) {
+    sim.broadcastPatch({ houses: w.houses });
+    sim.touchAgents();
+  }
   let taken = 0;
   for (const h of Object.values(w.houses)) {
     if (!isDwelling(h) || h.ownerId || h.style === 'mairie' || h.id.startsWith('place-') || h.id.startsWith('pont-')) continue;

@@ -68,3 +68,19 @@ test('une maison restée vide est démontée ; un arrivant bâtit sa propre mais
   assert.ok(!h || h.kind === 'carrefour', 'la maison vide est toujours là');
   assert.ok(Object.values(sim.world.agents).every((a) => sim.world.houses[a.houseId]), 'quelqu’un a perdu sa maison');
 });
+
+test('des enfants restés seuls sont recueillis ; leur maison vide disparaît', async () => {
+  const { sweepEmptyHouses } = await import('../sim/god');
+  const sim = village();
+  const [lucas, chloe] = [byName(sim, 'Lucas'), byName(sim, 'Chloé')];
+  const kid = { ...structuredClone(lucas), id: 'kid', name: 'Tom', family: { parentIds: [lucas.id, chloe.id], childIds: [] }, bornDay: sim.clock.day };
+  sim.world.agents.kid = kid;
+  const house = lucas.houseId;
+  sim.world.houses[house].ownerId = null;
+  delete sim.world.agents[lucas.id];
+  sweepEmptyHouses(sim);
+  assert.notEqual(sim.world.agents.kid.houseId, house, 'Tom est resté seul');
+  assert.ok(sim.journal.events.some((e) => /recueille Tom/.test(e.text)));
+  const h = sim.world.houses[house];
+  assert.ok(!h || h.kind === 'carrefour');
+});
