@@ -302,7 +302,9 @@ export type SimEventType =
   | 'health.sick' | 'health.healed' | 'repair.done' | 'song' | 'party'
   | 'village.event' | 'calendar' | 'life.hobby'
   // Catastrophes et coups de pouce du ciel
-  | 'house.destroyed' | 'house.rebuilt' | 'treasure.placed' | 'treasure.found' | 'god.gift';
+  | 'house.destroyed' | 'house.rebuilt' | 'treasure.placed' | 'treasure.found' | 'god.gift'
+  // Le temps qui passe
+  | 'agent.died' | 'life.reconcile';
 
 /** Une ligne du journal. Append-only, horodatée, rejouable : c'est le « script » des vidéos. */
 export interface SimEvent {
@@ -355,6 +357,9 @@ export interface WorldEffect {
   struck?: boolean;
 }
 
+/** Ce qu'on célèbre sur la place. */
+export type PartyKind = 'mariage' | 'bapteme' | 'fete' | 'obseques';
+
 /** Un coffre posé par le mode Dieu : le premier qui passe à côté le ramasse. */
 export interface Treasure {
   id: string;
@@ -383,7 +388,7 @@ export interface WorldState {
   /** Coffres qui attendent d'être trouvés. */
   treasures?: Treasure[];
   /** Fête en cours sur la place (guirlandes) : mariage, baptême ou fête du village. */
-  festivity?: { kind: 'mariage' | 'bapteme' | 'fete'; until: number; honorees: AgentId[] };
+  festivity?: { kind: PartyKind; until: number; honorees: AgentId[] };
   /** Le nom donné au chat de la place. */
   catName?: string;
   rumors: Rumor[];

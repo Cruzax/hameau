@@ -23,6 +23,8 @@ export function score(e: SimEvent): number {
     case 'treasure.found': return 9;
     case 'house.destroyed': return 9;
     case 'house.rebuilt': return 4;
+    case 'agent.died': return 7;
+    case 'life.reconcile': return 3;
     case 'village.event': return (p as { mishap?: string }).mishap ? 5 : 0;
     case 'god.gift': return (p as { kind?: string }).kind ? 6 : 4;
     case 'world.effect': return (p as { phase?: string; effect?: { kind?: string } }).phase === 'start' && (p as { effect?: { kind?: string } }).effect?.kind === 'flood' ? 5 : 0;

@@ -96,7 +96,11 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
         for (const id of e.actors) emote(id, String(p.kind) === 'mariage' ? '💍' : '🥳');
         break;
       case 'agent.left':
+      case 'agent.died':
         for (const id of (p.sad as string[] | undefined) ?? []) emote(id, '😢');
+        break;
+      case 'life.reconcile':
+        for (const id of e.actors) emote(id, '🤝');
         break;
       case 'house.destroyed':
         for (const id of e.actors) emote(id, '😭');

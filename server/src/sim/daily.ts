@@ -10,6 +10,7 @@ import {
   type Role,
   type TripPurpose,
   type EffectKind,
+  type PartyKind,
 } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { isAdult, placeName as workplaceName } from './economy';
@@ -47,13 +48,19 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
  * Envie de voler cette nuit (probabilité par décision nocturne) : le vagabond par habitude, l'affamé sans le sou
  * s'il est peu honnête, et le pauvre malhonnête par envie des plus riches.
  */
-export function theftUrge(a: Agent, s: { satiete: number; pain: number; pieces: number }): number {
+export function theftUrge(a: Agent, s: { satiete: number; pain: number; pieces: number; richest?: number }): number {
   if (a.role === 'VOLEUR') return s.satiete < 0.6 ? 0.5 : 0.2;
   const honesty = a.personality.honesty;
   if (honesty < 0.55 && s.satiete < 0.3 && s.pain === 0 && s.pieces < PRICES.pain) return 0.35;
   if (honesty < 0.4 && s.pieces < 3) return 0.06;
+  // La jalousie : même sans avoir faim, un malhonnête finit par lorgner sur la bourse des riches.
+  if (honesty < 0.4 && (s.richest ?? 0) >= ENVY_RICH && s.pieces * 4 < (s.richest ?? 0)) return ENVY_URGE;
   return 0;
 }
+
+/** Fortune qui rend jaloux, et envie de voler par tick de nuit (≈ 8 % par nuit). */
+const ENVY_RICH = 80;
+const ENVY_URGE = 0.002;
 
 /** Pain gardé d'avance à la maison, et heure limite pour aller en acheter. */
 const BREAD_RESERVE = 3;
@@ -104,7 +111,7 @@ export class Daily {
   readonly justice = new Justice();
   private lastNeedsPatch = 0;
   /** Fête prévue : on rassemble le village sur la place à cette heure. */
-  private party: { day: number; hour: number; reason: string; kind: 'mariage' | 'bapteme' | 'fete'; honorees: AgentId[] } | null = null;
+  private party: { day: number; hour: number; reason: string; kind: PartyKind; honorees: AgentId[] } | null = null;
   private sangToday = false;
   /** Tant que la forêt est « fermée » (loup), personne n'y va. */
   forestClosedUntil = 0;
@@ -348,7 +355,8 @@ export class Daily {
     // La nuit, on rentre et on dort… sauf le vagabond, qui a d'autres projets.
     if (night) {
       // Le vagabond vole par habitude ; un habitant peu honnête et affamé, sans pain ni sou, peut craquer.
-      const urge = theftUrge(a, { satiete: n.satiete, pain: inv.pain, pieces: inv.pieces });
+      const richest = Math.max(0, ...Object.values(sim.world.agents).filter((x) => x.id !== a.id).map((x) => x.inventory?.pieces ?? 0));
+      const urge = theftUrge(a, { satiete: n.satiete, pain: inv.pain, pieces: inv.pieces, richest });
       if (urge && home && hour >= 1 && hour < 3 && Math.random() < urge) {
         const target = this.richestHouse(sim, a);
         if (target && this.trip(sim, a, target, 'vol', 0.3)) return;
@@ -717,7 +725,7 @@ export class Daily {
   }
 
   /** Une fête sur la place le lendemain à 17 h : mariage d'un nouveau couple, baptême d'un bébé, ou simple fête. */
-  scheduleParty(sim: Sim, reason: string, kind: 'mariage' | 'bapteme' | 'fete' = 'fete', honorees: AgentId[] = []) {
+  scheduleParty(sim: Sim, reason: string, kind: PartyKind = 'fete', honorees: AgentId[] = []) {
     this.party = { day: sim.clock.day + 1, hour: 17, reason, kind, honorees };
   }
 
@@ -731,7 +739,9 @@ export class Daily {
       ? `💒 Mariage de ${names[0]} et ${names[1]} sur la place ! Guirlandes, musique, tout le village est invité.`
       : kind === 'bapteme' && names.length
         ? `🍼 Baptême de ${names[0]} sur la place ! On trinque au petit dernier du village.`
-        : `🎉 Fête sur la place : ${reason} ! Tout le village est invité.`;
+        : kind === 'obseques'
+          ? `🕯 Obsèques sur la place : ${reason}. Tout le village se recueille.`
+          : `🎉 Fête sur la place : ${reason} ! Tout le village est invité.`;
     sim.emit('party', honorees, text, { reason, kind });
     // Les guirlandes restent jusqu'à la fin de la fête (19 h 30).
     sim.world.festivity = { kind, honorees, until: sim.clock.tick + Math.round((sim.clock.ticksPerDay * 2.5) / 24) };

@@ -6,7 +6,7 @@ import type { SimEvent, WorldState } from '@hameau/shared';
 /** Ce qui mérite une brève. */
 const BRIEF_TYPES = new Set<SimEvent['type']>([
   'agent.born', 'couple.formed', 'couple.split', 'agent.added', 'agent.left', 'workplace.opened', 'workplace.closed',
-  'crime.theft', 'trial.verdict', 'treasure.found', 'village.event', 'house.destroyed', 'house.rebuilt', 'god.gift', 'mayor.elected', 'party', 'repair.done',
+  'crime.theft', 'trial.verdict', 'treasure.found', 'village.event', 'agent.died', 'life.reconcile', 'house.destroyed', 'house.rebuilt', 'god.gift', 'mayor.elected', 'party', 'repair.done',
 ]);
 const MAX_BRIEFS = 7;
 

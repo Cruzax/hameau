@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { attracted, ROLE_COLOR, ROLE_LABEL, satisfaction, type Agent, type WorldState, type Workplace } from '@hameau/shared';
+import { ageOf, attracted, isElder, ROLE_COLOR, ROLE_LABEL, satisfaction, type Agent, type WorldState, type Workplace } from '@hameau/shared';
 import { useHameau } from '../net/store';
 import { WORKPLACE_LABEL } from '../scene/House';
 import { Panel } from './Panel';
@@ -50,6 +50,8 @@ function Resident({ a, w }: { a: Agent; w: WorldState }) {
         <dd>{partner ? `en couple avec ${partner.name}` : 'célibataire'}{a.orientation ? ` · ${ORIENTATION[a.orientation]}` : ''}</dd>
         {kids.length > 0 && (<><dt>Enfants</dt><dd>{kids.map((k) => k.name).join(', ')}</dd></>)}
         {parents.length > 0 && (<><dt>Parents</dt><dd>{parents.map((p) => p.name).join(' et ')}</dd></>)}
+        <dt>Âge</dt>
+        <dd>{ageOf(a, w.clock.day)} jours{isElder(a, w.clock.day) ? ' · ancien' : ''}</dd>
         <dt>Caractère</dt>
         <dd>{a.personality.traits.join(', ') || '—'}</dd>
       </dl>

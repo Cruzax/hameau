@@ -1,5 +1,5 @@
 import { env } from '../env';
-import { attracted, isDwelling, mulberry32, randomOrientation, ROLE_LABEL, type Agent, type AgentId, type Role, type WorldState } from '@hameau/shared';
+import { ageOf, attracted, de, isDwelling, lifespanOf, mulberry32, randomOrientation, ROLE_LABEL, type Agent, type AgentId, type Role, type WorldState } from '@hameau/shared';
 import type { Sim } from './Sim';
 import { connectNode, neighbors } from './network';
 import { newHouse, slug } from './god';
@@ -30,6 +30,17 @@ const CROWDED_BROKE_PIECES = 12;
 /** Le ventre vide (satiété sous ce seuil) ce nombre de soirs d'affilée : on part aussi. */
 const HUNGRY_BELOW = 0.2;
 const HUNGRY_LEAVE_DAYS = 2;
+/** Arrivé au bout de sa vie, chaque soir, cette chance de s'éteindre. */
+const DEATH_CHANCE = 0.35;
+/** Les esprits voyageurs partent parfois voir le monde, même quand tout va bien. */
+const WANDER_CHANCE = 0.004;
+const WANDER_MIN_POP = 20;
+const WANDERERS = /r[eê]veur|ambitieux|curieux|courageux/;
+/** La rancune s'efface d'elle-même, un peu chaque soir… */
+const GRUDGE_BELOW = -0.3;
+const GRUDGE_HEAL = 0.01;
+/** …et parfois deux ennemis se réconcilient d'un coup. */
+const RECONCILE_CHANCE = 0.15;
 
 const TRAITS = ['rêveur', 'têtu', 'généreux', 'jaloux', 'drôle', 'anxieux', 'rusé', 'tendre', 'bavard', 'secret', 'courageux', 'paresseux'];
 
@@ -70,9 +81,101 @@ export class Life {
     this.couples(sim);
     this.births(sim);
     this.comingOfAge(sim);
+    this.oldAge(sim);
     this.fillGazette(sim);
+    this.healGrudges(sim);
     this.departures(sim);
+    this.wanderlust(sim);
     this.newcomers(sim);
+  }
+
+  // ─── Le temps qui passe ───────────────────────────────────────────────────
+
+  /** Au bout de sa vie, un ancien s'éteint paisiblement (un par soir au plus). */
+  private oldAge(sim: Sim) {
+    const w = sim.world;
+    if (Object.keys(w.agents).length <= 4) return;
+    for (const a of Object.values(w.agents)) {
+      if (ageOf(a, sim.clock.day) < lifespanOf(a) || this.rand() > DEATH_CHANCE) continue;
+      this.die(sim, a);
+      return;
+    }
+  }
+
+  /** Un décès : héritage, commerces et maison transmis, obsèques le lendemain sur la place. */
+  die(sim: Sim, a: Agent) {
+    const w = sim.world;
+    const age = ageOf(a, sim.clock.day);
+    const partner = a.family?.partnerId ? w.agents[a.family.partnerId] : undefined;
+    const kids = (a.family?.childIds ?? []).map((id) => w.agents[id]).filter((k): k is Agent => !!k);
+    const heirs = partner ? [partner] : kids;
+    const purse = a.inventory?.pieces ?? 0;
+    const inv = (x: Agent) => (x.inventory ??= { pain: 1, bois: 1, outils: 0, pieces: 5 });
+    if (heirs.length) for (const h of heirs) inv(h).pieces += Math.floor(purse / heirs.length);
+    else {
+      const shop = Object.values(w.workplaces).sort((x, y) => x.till - y.till)[0];
+      if (shop) shop.till += purse;
+    }
+    const heir = partner ?? kids.find((k) => isAdult(w, k));
+    for (const wp of Object.values(w.workplaces)) if (wp.ownerId === a.id) wp.ownerId = heir?.id ?? null;
+    const house = w.houses[a.houseId];
+    const stays = Object.values(w.agents).find((x) => x.id !== a.id && x.houseId === a.houseId && isAdult(w, x));
+    const sad = mourners(w, [a]);
+    const wasMayor = w.mayorId === a.id;
+    this.leave(sim, a);
+    if (house && !house.ownerId && stays) house.ownerId = stays.id;
+    const gone = a.sex === 'F' ? 'éteinte' : 'éteint';
+    const legacy = heirs.length && purse ? ` ${heirs.map((h) => h.name).join(' et ')} hérite${heirs.length > 1 ? 'nt' : ''} de ses économies.` : '';
+    sim.emit('agent.died', [a.id, ...heirs.map((h) => h.id)], `🕊 ${a.name} s’est ${gone} paisiblement, à ${age} jours.${legacy}`, { agentId: a.id, age, sad });
+    if (wasMayor) {
+      const esteem = (id: AgentId) => Object.values(w.agents).reduce((s, x) => s + (x.opinions[id] ?? 0), 0);
+      const next = Object.values(w.agents).filter((x) => isAdult(w, x)).sort((x, y) => esteem(y.id) - esteem(x.id))[0];
+      if (next) {
+        w.mayorId = next.id;
+        sim.politics.succeed(sim);
+        sim.emit('mayor.elected', [next.id], `👑 ${next.name} reprend l’écharpe ${de(a.name)}.`);
+      }
+    }
+    sim.daily.scheduleParty(sim, `on dit adieu à ${a.name}`, 'obseques');
+    sim.broadcastPatch({ houses: w.houses, workplaces: w.workplaces, mayorId: w.mayorId });
+    sim.touchAgents();
+  }
+
+  /** La rancune s'use avec le temps ; de loin en loin, deux ennemis enterrent la hache de guerre. */
+  private healGrudges(sim: Sim) {
+    const w = sim.world;
+    const feuds: [Agent, Agent][] = [];
+    for (const a of Object.values(w.agents)) {
+      for (const [id, op] of Object.entries(a.opinions)) {
+        if (op >= GRUDGE_BELOW) continue;
+        a.opinions[id] = op + GRUDGE_HEAL;
+        const b = w.agents[id];
+        if (b && a.id < b.id && (b.opinions[a.id] ?? 0) < GRUDGE_BELOW) feuds.push([a, b]);
+      }
+    }
+    if (!feuds.length || this.rand() > RECONCILE_CHANCE) return;
+    const [a, b] = this.pick(feuds);
+    a.opinions[b.id] = 0.1;
+    b.opinions[a.id] = 0.1;
+    sim.emit('life.reconcile', [a.id, b.id], `🤝 ${a.name} et ${b.name} enterrent la hache de guerre.`);
+    sim.touchAgents();
+  }
+
+  /** Un esprit voyageur, libre de toute attache, part parfois voir le monde. */
+  private wanderlust(sim: Sim) {
+    const w = sim.world;
+    if (Object.keys(w.agents).length < WANDER_MIN_POP) return;
+    for (const a of Object.values(w.agents)) {
+      if (a.id === w.mayorId || a.family?.partnerId || !isAdult(w, a) || !WANDERERS.test(a.personality.traits.join(' '))) continue;
+      if ((a.family?.childIds ?? []).some((k) => w.agents[k] && !isAdult(w, w.agents[k]))) continue;
+      if (this.rand() > WANDER_CHANCE) continue;
+      const sad = mourners(w, [a]);
+      this.leave(sim, a);
+      sim.emit('agent.left', [a.id], `🎒 ${a.name} a des fourmis dans les jambes : départ pour voir le monde !`, { agentId: a.id, wander: true, sad });
+      sim.broadcastPatch({ houses: w.houses });
+      sim.touchAgents();
+      return;
+    }
   }
 
   private pick<T>(xs: T[]): T {

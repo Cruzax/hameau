@@ -9,6 +9,7 @@ const COLORS = {
   mariage: ['#ffffff', '#f6c6d0', '#f3e3c3', '#e8a0b4'],
   bapteme: ['#bfe0f5', '#f8cfe0', '#fff1c1', '#d7f0d0'],
   fete: ['#c8553d', '#e2b13c', '#3f7a6b', '#4a7fc1', '#8a5a9e'],
+  obseques: ['#3b3b44', '#e8e8ee', '#6b6b78'],
 };
 const POLES = 8;
 const FLAGS_PER_SPAN = 7;
@@ -63,7 +64,7 @@ export function Festivity() {
           <meshStandardMaterial color={colors[f.k % colors.length]} flatShading />
         </mesh>
       ))}
-      <group ref={confetti} position={[plaza.center.x, 0, plaza.center.z]}>
+      <group ref={confetti} position={[plaza.center.x, 0, plaza.center.z]} visible={festivity.kind !== 'obseques'}>
         {layout.bits.map((_, i) => (
           <mesh key={i}>
             <planeGeometry args={[0.12, 0.08]} />

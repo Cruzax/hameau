@@ -7,6 +7,10 @@ const OPEN_AT = dayFraction(10);
 const CLOSE_AT = dayFraction(20);
 /** En dessous de cette opinion du maire, un agent est prêt à proposer sa destitution. */
 const MOTION_THRESHOLD = -0.05;
+/** Jours de mandat avant qu'une motion de destitution soit possible. */
+const MIN_TERM_DAYS = 10;
+/** Part du village qui doit voter pour destituer le maire. */
+const DESTITUTE_SHARE = 0.6;
 
 /**
  * Votes de destitution. Tous les N jours, l'agent le plus mécontent peut lancer une motion.
@@ -27,6 +31,11 @@ export class Politics {
 
   /** Jour où le maire actuel a pris ses fonctions (pour l'usure du pouvoir). */
   private mayorSince = 1;
+
+  /** Un nouveau maire prend ses fonctions hors élection (le précédent s'est éteint). */
+  succeed(sim: Sim) {
+    this.mayorSince = sim.clock.day;
+  }
   private lastProposer: string | null = null;
 
   /** Humeur du village envers le maire, chaque soir : la gazette est son bilan, et le pouvoir use. */
@@ -54,6 +63,8 @@ export class Politics {
 
   open(sim: Sim, force = false) {
     const w = sim.world;
+    // Un maire tout juste élu a le temps de faire ses preuves avant qu'on tente de le renverser.
+    if (!force && sim.clock.day - this.mayorSince < MIN_TERM_DAYS) return;
     const mayor = w.mayorId;
     const others = Object.values(w.agents).filter((a) => a.id !== mayor);
     // Parmi les mécontents, on tire au sort (en évitant le dernier à avoir lancé une motion).
@@ -130,8 +141,9 @@ export class Politics {
       sim.touchAgents();
       return;
     }
-    // Majorité absolue du village : un bulletin perdu en route compte comme un soutien au maire.
-    const destituted = yes.length > n / 2;
+    // Il faut une nette majorité du village (un bulletin perdu compte comme un soutien au maire) :
+    // le sortant garde l'avantage sur un vote serré.
+    const destituted = yes.length > n * DESTITUTE_SHARE;
     let newMayorId: AgentId | undefined;
     if (destituted) {
       const ranked = vote.candidates

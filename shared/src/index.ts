@@ -10,3 +10,4 @@ export * from './traits';
 export * from './satisfaction';
 export * from './feelings';
 export * from './names';
+export * from './age';
