@@ -11,6 +11,7 @@ import { House, WORKPLACE_LABEL } from './House';
 import { Trees } from './Trees';
 import { Messengers } from './Messengers';
 import { Bubbles } from './Bubbles';
+import { Ribbons } from './Ribbons';
 import { CameraDirector } from './CameraDirector';
 import { Residents } from './Residents';
 import { NatureSpots } from './NatureSpots';
@@ -153,6 +154,7 @@ export function Village() {
       <CameraDirector />
       <Messengers />
       <Bubbles />
+      <Ribbons />
     </>
   );
 }

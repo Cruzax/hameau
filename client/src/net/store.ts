@@ -11,10 +11,20 @@ export interface Bubble {
   until: number; // performance.now() en ms
 }
 
+/** Une parole dite à voix haute : un ruban qui reste là où elle a été dite, puis monte et s'efface. */
+export interface Ribbon {
+  id: number;
+  agentId: AgentId;
+  text: string;
+  born: number; // performance.now() en ms
+  until: number;
+}
+
 interface HameauState {
   world: WorldState;
   events: SimEvent[];
   bubbles: Record<AgentId, Bubble>;
+  ribbons: Ribbon[];
   connected: boolean;
   /** Partie de la dernière visite reprise (true), village neuf (false), pas encore su (null). */
   restored: boolean | null;
@@ -33,6 +43,7 @@ export const useHameau = create<HameauState>(() => ({
   world: createSeedWorld(),
   events: [],
   bubbles: {},
+  ribbons: [],
   connected: false,
   restored: null,
   tickAt: 0,
@@ -46,8 +57,15 @@ let bubbleSeq = 0;
 /** Transforme les lignes du journal en bulles au-dessus des personnages. */
 function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed: number) {
   const next = { ...current };
+  const said: Ribbon[] = [];
   const now = performance.now();
   const life = 5200 / Math.max(1, Math.sqrt(speed));
+  // Ce qu'on se dit de vive voix part en ruban (et efface la bulle qu'on avait au-dessus de la tête).
+  const say = (agentId: AgentId | undefined, text: string) => {
+    if (!agentId || !text) return;
+    said.push({ id: ++bubbleSeq, agentId, text, born: now, until: now + life * 1.3 });
+    if (next[agentId]?.kind !== 'emote') delete next[agentId];
+  };
   const put = (agentId: AgentId | undefined, text: string, kind: BubbleKind) => {
     if (agentId) next[agentId] = { id: ++bubbleSeq, agentId, text, kind, until: now + life };
   };
@@ -86,7 +104,7 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
       // Vie quotidienne : ce qu'on se dit de vive voix, ce qu'on chante, ce qu'on annonce.
       case 'life.meet':
       case 'rumor.spread': {
-        put(e.actors[0], String(p.body ?? ''), 'say');
+        say(e.actors[0], String(p.body ?? ''));
         // Ce que ressent celui qui écoute, juste avant de répondre.
         const feel = { hostile: '💢', flirt: '💕', kin: '🤗', cold: '😒', friendly: Math.random() < 0.4 ? '😊' : '' }[String(p.mood)];
         if (feel) emote(e.actors[1], feel);
@@ -140,12 +158,20 @@ function bubblesFrom(events: SimEvent[], current: Record<AgentId, Bubble>, speed
         break;
     }
   }
-  return next;
+  return { bubbles: next, said };
 }
 
+/** Rubans encore à l'écran, au plus. */
+const MAX_RIBBONS = 40;
+
 export function appendEvents(events: SimEvent[]) {
-  useHameau.setState((s) => ({
-    events: [...s.events, ...events].slice(-MAX_EVENTS),
-    bubbles: bubblesFrom(events, s.bubbles, s.world.clock.speed),
-  }));
+  useHameau.setState((s) => {
+    const { bubbles, said } = bubblesFrom(events, s.bubbles, s.world.clock.speed);
+    const now = performance.now();
+    return {
+      events: [...s.events, ...events].slice(-MAX_EVENTS),
+      bubbles,
+      ribbons: [...s.ribbons.filter((r) => r.until > now), ...said].slice(-MAX_RIBBONS),
+    };
+  });
 }

@@ -172,6 +172,7 @@ export function startReplay(events: SimEvent[], startSeq?: number) {
     world: base,
     events: sorted.filter((e) => e.seq < from).slice(-50),
     bubbles: {},
+    ribbons: [],
     replay: { tick: rp.tick, endTick: rp.endTick, speed: 1, paused: false },
   });
   rp.timer = setInterval(step, STEP_MS);
@@ -192,7 +193,7 @@ export function stopReplay(backToLive = true) {
   if (rp?.timer) clearInterval(rp.timer);
   rp = null;
   if (backToLive && useHameau.getState().mode === 'replay') {
-    useHameau.setState({ mode: 'live', replay: null, bubbles: {} });
+    useHameau.setState({ mode: 'live', replay: null, bubbles: {}, ribbons: [] });
     resync();
   }
 }

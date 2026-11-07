@@ -114,7 +114,7 @@ function handle(msg: ServerToClient) {
   if (useHameau.getState().mode === 'replay') return;
   switch (msg.type) {
     case 'snapshot':
-      useHameau.setState({ world: msg.world, events: msg.events, bubbles: {}, tickAt: performance.now() });
+      useHameau.setState({ world: msg.world, events: msg.events, bubbles: {}, ribbons: [], tickAt: performance.now() });
       break;
     case 'tick':
       useHameau.setState((s) => ({
